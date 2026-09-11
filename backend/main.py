@@ -213,6 +213,19 @@ LANGUAGE_RUNNERS = {
 
 # ── Endpoints ──────────────────────────────────────────────────────────────
 
+@app.get("/")
+async def root() -> dict:
+    return {
+        "message": "Mars Rover API is running!",
+        "status": "online",
+        "endpoints": {
+            "health": "/health",
+            "docs": "/docs",
+            "run": "POST /run",
+        },
+    }
+
+
 @app.get("/health")
 async def health() -> dict:
     return {"status": "ok", "supported_languages": list(LANGUAGE_RUNNERS.keys())}

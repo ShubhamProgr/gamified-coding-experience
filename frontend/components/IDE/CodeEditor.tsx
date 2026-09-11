@@ -2,7 +2,7 @@
 
 import { useRef, useCallback, useEffect } from "react";
 import Editor, { OnMount } from "@monaco-editor/react";
-import type { editor } from "monaco-editor";
+import type { editor, languages, Position } from "monaco-editor";
 
 interface CodeEditorProps {
   value: string;
@@ -93,7 +93,7 @@ export default function CodeEditor({
     if (language === "python") {
       monaco.languages.registerCompletionItemProvider("python", {
         triggerCharacters: ["."],
-        provideCompletionItems(model, position) {
+        provideCompletionItems(model: editor.ITextModel, position: Position) {
           const lineText = model.getLineContent(position.lineNumber);
           const wordBefore = lineText.slice(0, position.column - 1);
 
@@ -112,7 +112,7 @@ export default function CodeEditor({
             label: string,
             insertText: string,
             detail: string
-          ): editor.languages.CompletionItem => ({
+          ): languages.CompletionItem => ({
             label,
             kind: monaco.languages.CompletionItemKind.Method,
             insertText,
@@ -121,7 +121,7 @@ export default function CodeEditor({
             detail,
             documentation: detail,
             range,
-          } as editor.languages.CompletionItem);
+          } as languages.CompletionItem);
 
           return {
             suggestions: [

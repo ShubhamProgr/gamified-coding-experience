@@ -42,7 +42,11 @@ const CodeEditor = dynamic(() => import("@/components/IDE/CodeEditor"), {
   ),
 });
 
-const API_URL = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:8000";
+const API_URL =
+  process.env.BACKEND_RENDER_URL ??
+  process.env.NEXT_PUBLIC_BACKEND_RENDER_URL ??
+  process.env.NEXT_PUBLIC_API_URL ??
+  "http://localhost:8000";
 
 function makeId() {
   return Math.random().toString(36).slice(2);

@@ -45,10 +45,12 @@ from pydantic import BaseModel
 
 app = FastAPI(title="Mars Rover API", version="1.0.0")
 
+cors_origins = [origin.strip() for origin in os.getenv("ALLOWED_ORIGINS", "*").split(",") if origin.strip()]
+
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["http://localhost:3000", "http://127.0.0.1:3000"],
-    allow_credentials=True,
+    allow_origins=cors_origins if "*" not in cors_origins else ["*"],
+    allow_credentials=False if "*" in cors_origins else True,
     allow_methods=["*"],
     allow_headers=["*"],
 )

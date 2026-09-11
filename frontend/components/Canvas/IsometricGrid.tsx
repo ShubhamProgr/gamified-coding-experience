@@ -1,13 +1,19 @@
 "use client";
 
-import { useRef, useEffect, useCallback, useState } from "react";
-import type { RoverState, RoverFacing } from "./useRoverAnimation";
+import { useRef, useEffect, useCallback } from "react";
+import type { RoverState, RoverFacing, RoverAction } from "./useRoverAnimation";
+import {
+  MineralDeposit,
+  MINERAL_METAS,
+  getDepositKey,
+  INITIAL_DEPOSIT_CONFIGS,
+} from "./minerals";
 
 // ── Isometric constants ────────────────────────────────────────────────────
 
-const TILE_W = 72;
-const TILE_H = 36;
-const GRID_SIZE = 15;
+const TILE_W = 160;
+const TILE_H = 80;
+const GRID_SIZE = 3;
 
 // ── Tile types ─────────────────────────────────────────────────────────────
 
@@ -36,16 +42,20 @@ function generateMap(): Tile[][] {
     for (let c = 0; c < GRID_SIZE; c++) {
       const v = rand();
       let type: TileType = "sand";
-      if (v > 0.88) type = "darkrock";
-      else if (v > 0.75) type = "rock";
-      else if (v > 0.96) type = "mineral";
-      if (r === 7 && c === 7) type = "start";
-      map[r][c] = { type, elevation: Math.floor(rand() * 3), crackCount: Math.floor(rand() * 4) };
+      if (v > 0.85) type = "darkrock";
+      else if (v > 0.65) type = "rock";
+      if (r === 1 && c === 1) type = "start";
+      map[r][c] = { type, elevation: 0, crackCount: Math.floor(rand() * 3) };
     }
   }
-  // Scatter a few mineral deposits
-  const mineralSpots = [[3, 4], [11, 9], [5, 12], [9, 2]];
-  mineralSpots.forEach(([r, c]) => { map[r][c].type = "mineral"; });
+
+  // Stamp configured mineral deposit tiles
+  for (const dep of INITIAL_DEPOSIT_CONFIGS) {
+    if (dep.row >= 0 && dep.row < GRID_SIZE && dep.col >= 0 && dep.col < GRID_SIZE) {
+      map[dep.row][dep.col].type = "mineral";
+    }
+  }
+
   return map;
 }
 
@@ -57,7 +67,7 @@ const TILE_COLORS: Record<TileType, { top: string; left: string; right: string }
   sand:     { top: "#c4956a", left: "#a07550", right: "#8a6040" },
   rock:     { top: "#9a7255", left: "#7a5535", right: "#6a4525" },
   darkrock: { top: "#5a3a25", left: "#3a2010", right: "#2a1508" },
-  mineral:  { top: "#4a8a6a", left: "#2a6a4a", right: "#1a5a3a" },
+  mineral:  { top: "#3a564c", left: "#243d34", right: "#1a2c25" },
   start:    { top: "#c4956a", left: "#a07550", right: "#8a6040" },
 };
 
@@ -72,8 +82,160 @@ function isoToScreen(
 ): { x: number; y: number } {
   return {
     x: originX + (col - row) * (TILE_W / 2),
-    y: originY + (col + row) * (TILE_H / 2) - elevation * 6,
+    y: originY + (col + row) * (TILE_H / 2) - elevation * 5,
   };
+}
+
+// ── 3D Crystal Cluster Drawing ─────────────────────────────────────────────
+
+function drawCrystalCluster(
+  ctx: CanvasRenderingContext2D,
+  cx: number,
+  cy: number,
+  deposit: MineralDeposit,
+  time: number
+) {
+  const meta = MINERAL_METAS[deposit.type];
+  const isDepleted = deposit.depleted || deposit.remainingAmount <= 0;
+  const ratio = deposit.remainingAmount / deposit.totalAmount;
+
+  ctx.save();
+  ctx.translate(cx, cy);
+  ctx.scale(1.6, 1.6);
+
+  if (isDepleted) {
+    // Shattered crystal stump / excavated pit
+    ctx.fillStyle = "#1e2922";
+    ctx.beginPath();
+    ctx.ellipse(0, 0, 10, 5, 0, 0, Math.PI * 2);
+    ctx.fill();
+
+    // Small fractured shard stumps
+    ctx.fillStyle = meta.color + "55";
+    ctx.beginPath();
+    ctx.moveTo(-5, 0);
+    ctx.lineTo(-3, -4);
+    ctx.lineTo(-1, 0);
+    ctx.fill();
+
+    ctx.beginPath();
+    ctx.moveTo(2, 0);
+    ctx.lineTo(4, -3);
+    ctx.lineTo(6, 0);
+    ctx.fill();
+    ctx.restore();
+    return;
+  }
+
+  // Pulsing ambient glow
+  const pulse = 0.85 + 0.15 * Math.sin(time * 0.003 + deposit.col * 2 + deposit.row);
+
+  // Radial ground aura
+  const auraGrad = ctx.createRadialGradient(0, 0, 0, 0, 0, 18);
+  auraGrad.addColorStop(0, meta.color + "40");
+  auraGrad.addColorStop(1, "transparent");
+  ctx.fillStyle = auraGrad;
+  ctx.beginPath();
+  ctx.ellipse(0, 0, 18, 9, 0, 0, Math.PI * 2);
+  ctx.fill();
+
+  // Spires scale according to remaining reserves
+  const sizeScale = 0.6 + 0.4 * ratio;
+
+  // Spires specifications: [dx, dy, width, height, tiltX]
+  const spires = [
+    { dx: -7, dy: -2, w: 5, h: 14 * sizeScale, tilt: -2 },
+    { dx: 6, dy: 1, w: 5, h: 12 * sizeScale, tilt: 2 },
+    { dx: 0, dy: 2, w: 7, h: 22 * sizeScale, tilt: 0 },
+    { dx: -1, dy: 5, w: 4, h: 9 * sizeScale, tilt: -1 },
+  ];
+
+  ctx.shadowBlur = 8 * pulse;
+  ctx.shadowColor = meta.glowColor;
+
+  for (const s of spires) {
+    const bx = s.dx;
+    const by = s.dy;
+    const apexX = bx + s.tilt;
+    const apexY = by - s.h;
+
+    // Left face (shaded)
+    ctx.fillStyle = meta.bgRgba;
+    ctx.beginPath();
+    ctx.moveTo(bx - s.w / 2, by);
+    ctx.lineTo(apexX, apexY);
+    ctx.lineTo(bx, by + 2);
+    ctx.closePath();
+    ctx.fill();
+
+    // Right face (bright specular)
+    ctx.fillStyle = meta.color;
+    ctx.beginPath();
+    ctx.moveTo(bx + s.w / 2, by);
+    ctx.lineTo(apexX, apexY);
+    ctx.lineTo(bx, by + 2);
+    ctx.closePath();
+    ctx.fill();
+
+    // Crystal facet edge
+    ctx.strokeStyle = "rgba(255, 255, 255, 0.5)";
+    ctx.lineWidth = 0.8;
+    ctx.beginPath();
+    ctx.moveTo(apexX, apexY);
+    ctx.lineTo(bx, by + 2);
+    ctx.stroke();
+
+    // Glint on peak
+    ctx.fillStyle = "#ffffff";
+    ctx.beginPath();
+    ctx.arc(apexX, apexY, 1.2, 0, Math.PI * 2);
+    ctx.fill();
+  }
+
+  // Floating micro-glint sparkles for exotic / rare minerals
+  if (deposit.type === "xenocryst" || deposit.type === "lithium") {
+    const sparkT = (time * 0.002 + deposit.col) % 1;
+    const sparkX = Math.sin(time * 0.004) * 10;
+    const sparkY = -20 - sparkT * 12;
+    ctx.fillStyle = "#ffffff";
+    ctx.shadowBlur = 10;
+    ctx.shadowColor = meta.color;
+    ctx.beginPath();
+    ctx.arc(sparkX, sparkY, 1.2 * (1 - sparkT), 0, Math.PI * 2);
+    ctx.fill();
+  }
+
+  ctx.restore();
+}
+
+// ── Borehole / Excavation Crater ────────────────────────────────────────────
+
+function drawBorehole(ctx: CanvasRenderingContext2D, cx: number, cy: number, count: number) {
+  ctx.save();
+  ctx.translate(cx, cy);
+  ctx.scale(1.5, 1.5);
+
+  // Scorched outer rim
+  ctx.fillStyle = "#1e130a";
+  ctx.beginPath();
+  ctx.ellipse(0, 2, 7 + Math.min(count, 3), 3.5 + Math.min(count, 2), 0, 0, Math.PI * 2);
+  ctx.fill();
+
+  // Deep hole core
+  ctx.fillStyle = "#0a0603";
+  ctx.beginPath();
+  ctx.ellipse(0, 2.5, 4.5, 2.2, 0, 0, Math.PI * 2);
+  ctx.fill();
+
+  // Small excavated rubble specks
+  ctx.fillStyle = "#7a5535";
+  ctx.beginPath();
+  ctx.arc(-7, 0, 1, 0, Math.PI * 2);
+  ctx.arc(8, 1, 1.2, 0, Math.PI * 2);
+  ctx.arc(-3, 5, 0.9, 0, Math.PI * 2);
+  ctx.fill();
+
+  ctx.restore();
 }
 
 // ── Drawing primitives ─────────────────────────────────────────────────────
@@ -83,12 +245,17 @@ function drawTile(
   sx: number,
   sy: number,
   tile: Tile,
-  highlight = false
+  col: number,
+  row: number,
+  highlight = false,
+  deposit?: MineralDeposit,
+  drilledCount?: number,
+  time = 0
 ) {
   const { top, left, right } = TILE_COLORS[tile.type];
   const hw = TILE_W / 2;
   const hh = TILE_H / 2;
-  const depth = 6 + tile.elevation * 3;
+  const depth = 14 + tile.elevation * 3;
 
   // Top face (rhombus)
   ctx.beginPath();
@@ -99,7 +266,13 @@ function drawTile(
   ctx.closePath();
   if (highlight) {
     const grad = ctx.createLinearGradient(sx, sy - hh, sx + TILE_W, sy + hh);
-    grad.addColorStop(0, "#00d4ff30");
+    grad.addColorStop(0, "#00d4ff45");
+    grad.addColorStop(1, top);
+    ctx.fillStyle = grad;
+  } else if (deposit && !deposit.depleted) {
+    const meta = MINERAL_METAS[deposit.type];
+    const grad = ctx.createLinearGradient(sx, sy - hh, sx + TILE_W, sy + hh);
+    grad.addColorStop(0, meta.color + "25");
     grad.addColorStop(1, top);
     ctx.fillStyle = grad;
   } else {
@@ -107,10 +280,19 @@ function drawTile(
   }
   ctx.fill();
 
-  // Subtle grid line on top
-  ctx.strokeStyle = "rgba(0,0,0,0.18)";
-  ctx.lineWidth = 0.5;
+  // Grid line border on top
+  ctx.strokeStyle = highlight ? "rgba(0, 212, 255, 0.7)" : "rgba(255, 255, 255, 0.08)";
+  ctx.lineWidth = highlight ? 1.5 : 0.8;
   ctx.stroke();
+
+  // Subtle coordinate stamp on tile top face
+  ctx.save();
+  ctx.font = "600 10px 'Fira Code', monospace";
+  ctx.fillStyle = highlight ? "rgba(0, 212, 255, 0.8)" : "rgba(255, 255, 255, 0.28)";
+  ctx.textAlign = "center";
+  ctx.textBaseline = "middle";
+  ctx.fillText(`(${col},${row})`, sx + hw, sy - hh + 14);
+  ctx.restore();
 
   // Left face
   ctx.beginPath();
@@ -132,55 +314,73 @@ function drawTile(
   ctx.fillStyle = right;
   ctx.fill();
 
-  // Mineral shimmer
-  if (tile.type === "mineral") {
-    ctx.beginPath();
-    ctx.moveTo(sx + hw * 0.8, sy - hh * 0.3);
-    ctx.lineTo(sx + hw * 1.1, sy + hh * 0.1);
-    ctx.lineTo(sx + hw, sy - hh * 0.05);
-    ctx.closePath();
-    ctx.fillStyle = "rgba(0,255,136,0.45)";
-    ctx.fill();
-  }
+  const cx = sx + hw;
+  const cy = sy;
 
   // Procedural cracks on top
   if (tile.crackCount > 0 && tile.type !== "mineral") {
-    ctx.strokeStyle = "rgba(0,0,0,0.25)";
+    ctx.strokeStyle = "rgba(0,0,0,0.22)";
     ctx.lineWidth = 0.7;
     for (let i = 0; i < tile.crackCount; i++) {
-      const ox = sx + hw * 0.5 + (i * 18 % TILE_W);
-      const oy = sy - hh * 0.2 + i * 4;
+      const ox = sx + hw * 0.4 + ((i * 32) % (TILE_W * 0.7));
+      const oy = sy - hh * 0.2 + i * 5;
       ctx.beginPath();
       ctx.moveTo(ox, oy);
-      ctx.lineTo(ox + 8 + i * 3, oy + 3 + i);
+      ctx.lineTo(ox + 10 + i * 2, oy + 4 + i);
       ctx.stroke();
     }
   }
 
-  // Start tile marker
-  if (tile.type === "start") {
+  // Render Borehole if drilled
+  if (drilledCount && drilledCount > 0) {
+    drawBorehole(ctx, cx, cy, drilledCount);
+  }
+
+  // Render 3D Mineral Crystals if deposit exists
+  if (deposit) {
+    drawCrystalCluster(ctx, cx, cy, deposit, time);
+  }
+
+  // Start tile marker (Center base station)
+  if (tile.type === "start" || (col === 1 && row === 1)) {
+    ctx.save();
     ctx.beginPath();
-    ctx.arc(sx + hw, sy, 4, 0, Math.PI * 2);
-    ctx.fillStyle = "rgba(0,212,255,0.5)";
-    ctx.fill();
+    ctx.ellipse(cx, cy, 18, 9, 0, 0, Math.PI * 2);
+    ctx.strokeStyle = "rgba(0,212,255,0.4)";
+    ctx.lineWidth = 1.5;
+    ctx.setLineDash([4, 4]);
+    ctx.stroke();
+    ctx.restore();
   }
 }
+
+// ── Rover Drawing with Dynamic Drill Assembly ──────────────────────────────
 
 function drawRover(
   ctx: CanvasRenderingContext2D,
   sx: number,
   sy: number,
   facing: RoverFacing,
-  battery: number
+  battery: number,
+  isDrilling: boolean,
+  progress: number,
+  time: number,
+  lastDrillResult: RoverState["lastDrillResult"]
 ) {
   const hw = TILE_W / 2;
-  const hh = TILE_H / 2;
   // Rover body center relative to tile top-center
-  const cx = sx + hw;
-  const cy = sy - 4;
+  let cx = sx + hw;
+  let cy = sy - 4;
+
+  // Mechanical vibration shake when active drill
+  if (isDrilling) {
+    cx += (Math.sin(time * 0.08) + Math.cos(time * 0.13)) * 2;
+    cy += (Math.cos(time * 0.09) - Math.sin(time * 0.11)) * 1.5;
+  }
 
   ctx.save();
   ctx.translate(cx, cy);
+  ctx.scale(1.5, 1.5);
 
   // Battery glow color
   const batteryColor =
@@ -190,15 +390,15 @@ function drawRover(
 
   // Glow effect
   ctx.shadowBlur = 18;
-  ctx.shadowColor = batteryColor;
+  ctx.shadowColor = isDrilling ? "var(--glow-amber, #ffb700)" : batteryColor;
 
-  // Body (rounded rect approximation)
+  // Body (rounded rect)
   const bw = 24, bh = 14;
   ctx.beginPath();
   ctx.roundRect(-bw / 2, -bh / 2 - 8, bw, bh, 3);
   ctx.fillStyle = "#1e2d42";
   ctx.fill();
-  ctx.strokeStyle = batteryColor;
+  ctx.strokeStyle = isDrilling ? "#ff9900" : batteryColor;
   ctx.lineWidth = 1.5;
   ctx.stroke();
 
@@ -227,9 +427,6 @@ function drawRover(
   ctx.beginPath();
   ctx.arc(0, -bh / 2 - 19, 3, 0, Math.PI * 2);
   ctx.fillStyle = batteryColor;
-  ctx.fill();
-  ctx.shadowBlur = 8;
-  ctx.shadowColor = batteryColor;
   ctx.fill();
 
   // Wheels (6 wheels, isometric style)
@@ -269,47 +466,129 @@ function drawRover(
   ctx.fill();
   ctx.restore();
 
-  ctx.restore();
-}
+  // ── ACTIVE DRILL RIG & VFX ──
+  if (isDrilling) {
+    // Heavy pneumatic drill shaft extending into the rock
+    ctx.save();
+    ctx.lineWidth = 3;
+    ctx.strokeStyle = "#94a3b8";
+    ctx.beginPath();
+    ctx.moveTo(0, -bh / 2 + 6);
+    ctx.lineTo(0, 10);
+    ctx.stroke();
 
-function drawGrid(
-  ctx: CanvasRenderingContext2D,
-  width: number,
-  height: number,
-  roverCol: number,
-  roverRow: number,
-  trail: Array<{ col: number; row: number }>,
-  animOffset: { dx: number; dy: number }
-) {
-  const originX = width / 2;
-  const originY = height * 0.3;
-
-  // Sort order: back to front (painter's algorithm for iso)
-  for (let r = 0; r < GRID_SIZE; r++) {
-    for (let c = 0; c < GRID_SIZE; c++) {
-      const tile = MAP[r][c];
-      const { x: sx, y: sy } = isoToScreen(c, r, originX, originY, tile.elevation);
-
-      // Check trail
-      const onTrail = trail.some((t) => t.col === c && t.row === r);
-      const isRover = c === roverCol && r === roverRow;
-
-      drawTile(ctx, sx, sy, tile, onTrail && !isRover);
+    // High-speed spinning drill bit flutes
+    ctx.lineWidth = 4;
+    ctx.strokeStyle = "#e2e8f0";
+    const drillPhase = (time * 0.05) % 6;
+    for (let d = -2; d <= 8; d += 3) {
+      const yPos = d + drillPhase;
+      if (yPos >= -2 && yPos <= 10) {
+        ctx.beginPath();
+        ctx.moveTo(-3, yPos);
+        ctx.lineTo(3, yPos + 1.5);
+        ctx.stroke();
+      }
     }
+
+    // Diamond cone tip & impact flare
+    ctx.fillStyle = "#ffffff";
+    ctx.beginPath();
+    ctx.moveTo(-3, 8);
+    ctx.lineTo(3, 8);
+    ctx.lineTo(0, 13);
+    ctx.closePath();
+    ctx.fill();
+
+    // Intense impact glow flare
+    const flareGrad = ctx.createRadialGradient(0, 12, 0, 0, 12, 10);
+    flareGrad.addColorStop(0, "rgba(255, 255, 255, 0.95)");
+    flareGrad.addColorStop(0.4, "rgba(255, 180, 50, 0.7)");
+    flareGrad.addColorStop(1, "transparent");
+    ctx.fillStyle = flareGrad;
+    ctx.beginPath();
+    ctx.arc(0, 12, 10, 0, Math.PI * 2);
+    ctx.fill();
+
+    // Expanding ground shockwave ripple
+    const waveR = 8 + (progress * 20) % 20;
+    const waveA = Math.max(0, 1 - waveR / 28);
+    ctx.strokeStyle = `rgba(255, 200, 100, ${waveA})`;
+    ctx.lineWidth = 1.2;
+    ctx.beginPath();
+    ctx.ellipse(0, 12, waveR, waveR * 0.5, 0, 0, Math.PI * 2);
+    ctx.stroke();
+
+    // Mineral-tinted spark & shard fountain
+    const sparkColor = lastDrillResult
+      ? MINERAL_METAS[lastDrillResult.type]?.color || "#00ffaa"
+      : "#ffb700";
+
+    ctx.fillStyle = sparkColor;
+    ctx.shadowBlur = 8;
+    ctx.shadowColor = sparkColor;
+
+    for (let i = 0; i < 10; i++) {
+      const pAngle = (i * Math.PI * 2) / 10 + (time * 0.003);
+      const pDist = 8 + ((time * 0.06 + i * 5) % 22);
+      const px = Math.cos(pAngle) * pDist;
+      const py = 12 - Math.sin((pDist / 22) * Math.PI) * 14 + Math.sin(pAngle) * (pDist * 0.4);
+      ctx.beginPath();
+      ctx.arc(px, py, 1.2, 0, Math.PI * 2);
+      ctx.fill();
+    }
+
+    // Dust puffs
+    ctx.shadowBlur = 0;
+    ctx.fillStyle = "rgba(196, 149, 106, 0.35)";
+    for (let i = 0; i < 4; i++) {
+      const dustX = (Math.sin(time * 0.01 + i * 2) * 16);
+      const dustY = 10 + (Math.cos(time * 0.01 + i * 1.5) * 4);
+      ctx.beginPath();
+      ctx.arc(dustX, dustY, 4 + i, 0, Math.PI * 2);
+      ctx.fill();
+    }
+
+    ctx.restore();
   }
 
-  // Draw rover with animated offset
-  const { x: rsx, y: rsy } = isoToScreen(roverCol, roverRow, originX, originY);
-  const roverTile = MAP[roverRow][roverCol];
-  drawRover(
-    ctx,
-    rsx + animOffset.dx,
-    rsy + animOffset.dy - roverTile.elevation * 6,
-    "NORTH", // facing handled by hook
-    100
-  );
+  // ── FLOATING HARVEST POPUP ──
+  if (lastDrillResult && isDrilling) {
+    const meta = MINERAL_METAS[lastDrillResult.type];
+    const floatY = -bh / 2 - 32 - progress * 14;
+    const text = lastDrillResult.amount > 0
+      ? `+${lastDrillResult.amount} ${meta.shortName}`
+      : "No Yield";
 
-  return { originX, originY };
+    ctx.save();
+    ctx.font = "bold 11px system-ui, sans-serif";
+    const textWidth = ctx.measureText(text).width;
+    const padX = 8;
+    const pillW = textWidth + padX * 2 + 14;
+    const pillH = 20;
+
+    // Glass pill background
+    ctx.beginPath();
+    ctx.roundRect(-pillW / 2, floatY - pillH / 2, pillW, pillH, 10);
+    ctx.fillStyle = "rgba(10, 15, 25, 0.88)";
+    ctx.fill();
+    ctx.strokeStyle = meta.color;
+    ctx.lineWidth = 1.2;
+    ctx.shadowBlur = 10;
+    ctx.shadowColor = meta.glowColor;
+    ctx.stroke();
+
+    // Icon + text
+    ctx.fillStyle = meta.color;
+    ctx.shadowBlur = 4;
+    ctx.textAlign = "center";
+    ctx.textBaseline = "middle";
+    ctx.fillText(`${meta.icon} ${text}`, 0, floatY);
+
+    ctx.restore();
+  }
+
+  ctx.restore();
 }
 
 // ── Component ──────────────────────────────────────────────────────────────
@@ -318,9 +597,15 @@ interface IsometricGridProps {
   roverState: RoverState;
   isPlaying: boolean;
   progress: number;
+  currentAction?: RoverAction | null;
 }
 
-export default function IsometricGrid({ roverState, isPlaying, progress }: IsometricGridProps) {
+export default function IsometricGrid({
+  roverState,
+  isPlaying,
+  progress,
+  currentAction,
+}: IsometricGridProps) {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const containerRef = useRef<HTMLDivElement>(null);
   const trailRef = useRef<Array<{ col: number; row: number }>>([]);
@@ -339,7 +624,7 @@ export default function IsometricGrid({ roverState, isPlaying, progress }: Isome
     }
   }, [roverState.col, roverState.row]);
 
-  const draw = useCallback(() => {
+  const draw = useCallback((time: number) => {
     const canvas = canvasRef.current;
     const container = containerRef.current;
     if (!canvas || !container) return;
@@ -381,16 +666,38 @@ export default function IsometricGrid({ roverState, isPlaying, progress }: Isome
     });
 
     const originX = w / 2;
-    const originY = h * 0.3;
+    const originY = h / 2 - TILE_H;
 
-    // Draw all tiles
+    // Drilled holes map lookup
+    const holesMap = new Map<string, number>();
+    for (const hItem of roverState.drilledHoles) {
+      holesMap.set(getDepositKey(hItem.col, hItem.row), hItem.count);
+    }
+
+    // Draw all tiles (Painter's sort: back to front)
     for (let r = 0; r < GRID_SIZE; r++) {
       for (let c = 0; c < GRID_SIZE; c++) {
         const tile = MAP[r][c];
         const { x: sx, y: sy } = isoToScreen(c, r, originX, originY, tile.elevation);
         const onTrail = trailRef.current.some((t) => t.col === c && t.row === r);
         const isRoverPos = c === roverState.col && r === roverState.row;
-        drawTile(ctx, sx, sy, tile, onTrail && !isRoverPos);
+
+        const depKey = getDepositKey(c, r);
+        const deposit = roverState.deposits[depKey];
+        const drilledCount = holesMap.get(depKey);
+
+        drawTile(
+          ctx,
+          sx,
+          sy,
+          tile,
+          c,
+          r,
+          onTrail && !isRoverPos,
+          deposit,
+          drilledCount,
+          time
+        );
       }
     }
 
@@ -403,14 +710,25 @@ export default function IsometricGrid({ roverState, isPlaying, progress }: Isome
     const lerpY = prevSy + (curSy - prevSy) * progress;
 
     const roverTile = MAP[roverState.row][roverState.col];
-    drawRover(ctx, lerpX, lerpY - roverTile.elevation * 6, roverState.facing, roverState.battery);
+    const isDrillingAction = currentAction?.action === "DRILL" || roverState.isDrilling;
 
-  }, [roverState, progress]);
+    drawRover(
+      ctx,
+      lerpX,
+      lerpY - roverTile.elevation * 5,
+      roverState.facing,
+      roverState.battery,
+      isDrillingAction,
+      progress,
+      time,
+      roverState.lastDrillResult
+    );
+  }, [roverState, progress, currentAction]);
 
   // Animation loop
   useEffect(() => {
-    const loop = () => {
-      draw();
+    const loop = (timestamp: number) => {
+      draw(timestamp);
       rafRef.current = requestAnimationFrame(loop);
     };
     rafRef.current = requestAnimationFrame(loop);
@@ -421,10 +739,13 @@ export default function IsometricGrid({ roverState, isPlaying, progress }: Isome
 
   // Resize observer
   useEffect(() => {
-    const obs = new ResizeObserver(() => { draw(); });
+    const obs = new ResizeObserver(() => { draw(performance.now()); });
     if (containerRef.current) obs.observe(containerRef.current);
     return () => obs.disconnect();
   }, [draw]);
+
+  // Check deposit under rover
+  const currentTileDeposit = roverState.deposits[getDepositKey(roverState.col, roverState.row)];
 
   return (
     <div ref={containerRef} style={{ width: "100%", height: "100%", position: "relative" }}>
@@ -433,26 +754,48 @@ export default function IsometricGrid({ roverState, isPlaying, progress }: Isome
         style={{ display: "block", width: "100%", height: "100%" }}
       />
 
-      {/* Coordinate overlay */}
+      {/* Coordinate & Subsurface Sensor overlay */}
       <div
         style={{
           position: "absolute",
           bottom: 12,
           left: 12,
-          padding: "4px 10px",
+          display: "flex",
+          alignItems: "center",
+          gap: 8,
+          padding: "5px 12px",
           borderRadius: "var(--radius-md)",
-          background: "rgba(7,9,15,0.8)",
+          background: "rgba(7,9,15,0.85)",
           border: "1px solid var(--space-border)",
           fontFamily: "var(--font-code)",
           fontSize: 11,
           color: "var(--glow-cyan)",
           backdropFilter: "blur(8px)",
+          boxShadow: "0 4px 16px rgba(0,0,0,0.4)",
         }}
       >
-        ({roverState.col}, {roverState.row}) · {roverState.facing}
+        <span>
+          ({roverState.col}, {roverState.row}) · {roverState.facing}
+        </span>
+        {currentTileDeposit && !currentTileDeposit.depleted && (
+          <span
+            style={{
+              padding: "1px 6px",
+              borderRadius: 3,
+              background: MINERAL_METAS[currentTileDeposit.type].bgRgba,
+              border: `1px solid ${MINERAL_METAS[currentTileDeposit.type].color}`,
+              color: MINERAL_METAS[currentTileDeposit.type].color,
+              fontSize: 10,
+              fontWeight: 600,
+            }}
+          >
+            {MINERAL_METAS[currentTileDeposit.type].icon}{" "}
+            {MINERAL_METAS[currentTileDeposit.type].shortName} ({currentTileDeposit.remainingAmount}u)
+          </span>
+        )}
       </div>
 
-      {/* Playing indicator */}
+      {/* Playing / Action indicator */}
       {isPlaying && (
         <div
           style={{
@@ -462,15 +805,20 @@ export default function IsometricGrid({ roverState, isPlaying, progress }: Isome
             display: "flex",
             alignItems: "center",
             gap: 6,
-            padding: "4px 10px",
+            padding: "5px 12px",
             borderRadius: "var(--radius-md)",
-            background: "rgba(7,9,15,0.8)",
-            border: "1px solid var(--glow-green)",
+            background: "rgba(7,9,15,0.85)",
+            border: currentAction?.action === "DRILL"
+              ? "1px solid var(--glow-amber, #ffb700)"
+              : "1px solid var(--glow-green)",
             fontFamily: "var(--font-ui)",
             fontSize: 11,
             fontWeight: 600,
-            color: "var(--glow-green)",
+            color: currentAction?.action === "DRILL"
+              ? "var(--glow-amber, #ffb700)"
+              : "var(--glow-green)",
             backdropFilter: "blur(8px)",
+            boxShadow: "0 4px 16px rgba(0,0,0,0.4)",
           }}
         >
           <div
@@ -478,11 +826,13 @@ export default function IsometricGrid({ roverState, isPlaying, progress }: Isome
               width: 6,
               height: 6,
               borderRadius: "50%",
-              background: "var(--glow-green)",
-              animation: "pulse-glow 1s ease-in-out infinite",
+              background: currentAction?.action === "DRILL"
+                ? "var(--glow-amber, #ffb700)"
+                : "var(--glow-green)",
+              animation: "pulse-glow 0.8s ease-in-out infinite",
             }}
           />
-          EXECUTING
+          {currentAction?.action === "DRILL" ? "DRILLING CORE SAMPLE" : "EXECUTING"}
         </div>
       )}
     </div>

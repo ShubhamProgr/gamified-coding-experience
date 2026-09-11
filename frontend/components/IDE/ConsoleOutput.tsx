@@ -122,6 +122,7 @@ export default function ConsoleOutput({ logs, onClear }: ConsoleOutputProps) {
           )}
         </div>
         <button
+          type="button"
           onClick={onClear}
           disabled={logs.length === 0}
           title="Clear console"

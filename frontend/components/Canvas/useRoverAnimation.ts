@@ -1,6 +1,13 @@
 "use client";
 
 import { useState, useEffect, useCallback, useRef } from "react";
+import {
+  MineralType,
+  MineralDeposit,
+  MINERAL_METAS,
+  createInitialDepositsMap,
+  getDepositKey,
+} from "./minerals";
 
 // ── Types ──────────────────────────────────────────────────────────────────
 
@@ -15,6 +22,25 @@ export interface RoverAction {
 
 export type RoverFacing = "NORTH" | "SOUTH" | "EAST" | "WEST";
 
+export interface DrillResult {
+  success: boolean;
+  type: MineralType;
+  amount: number;
+  remaining: number;
+  tileCol: number;
+  tileRow: number;
+  message: string;
+  timestamp: number;
+}
+
+export interface RoverInventory {
+  lithium: number;
+  xenocryst: number;
+  titanium: number;
+  hematite: number;
+  regolith: number;
+}
+
 export interface RoverState {
   col: number;
   row: number;
@@ -24,6 +50,12 @@ export interface RoverState {
   scans: number;
   actionIndex: number;
   isMoving: boolean;
+  isDrilling: boolean;
+  cargoCapacity: number;
+  inventory: RoverInventory;
+  lastDrillResult: DrillResult | null;
+  deposits: Record<string, MineralDeposit>;
+  drilledHoles: Array<{ col: number; row: number; count: number }>;
 }
 
 export interface AnimationState {
@@ -47,14 +79,26 @@ const BATTERY_COSTS: Record<string, number> = {
 };
 
 const INITIAL_STATE: RoverState = {
-  col: 7,
-  row: 7,
+  col: 1,
+  row: 1,
   facing: "NORTH",
   battery: 100,
   minerals: 0,
   scans: 0,
   actionIndex: -1,
   isMoving: false,
+  isDrilling: false,
+  cargoCapacity: 250,
+  inventory: {
+    lithium: 0,
+    xenocryst: 0,
+    titanium: 0,
+    hematite: 0,
+    regolith: 0,
+  },
+  lastDrillResult: null,
+  deposits: createInitialDepositsMap(),
+  drilledHoles: [],
 };
 
 const DIRECTION_DELTA: Record<string, { dc: number; dr: number }> = {
@@ -71,7 +115,7 @@ const TURN_MAP: Record<RoverFacing, { LEFT: RoverFacing; RIGHT: RoverFacing }> =
   WEST:  { LEFT: "SOUTH", RIGHT: "NORTH" },
 };
 
-const GRID_SIZE = 15;
+const GRID_SIZE = 3;
 
 function clamp(v: number, min: number, max: number) {
   return Math.max(min, Math.min(max, v));
@@ -80,7 +124,10 @@ function clamp(v: number, min: number, max: number) {
 // ── Hook ───────────────────────────────────────────────────────────────────
 
 export function useRoverAnimation(actions: RoverAction[]) {
-  const [state, setState] = useState<RoverState>({ ...INITIAL_STATE });
+  const [state, setState] = useState<RoverState>(() => ({
+    ...INITIAL_STATE,
+    deposits: createInitialDepositsMap(),
+  }));
   const [isPlaying, setIsPlaying] = useState(false);
   const [isFinished, setIsFinished] = useState(false);
   const [speed, setSpeed] = useState(400); // ms per action
@@ -95,6 +142,7 @@ export function useRoverAnimation(actions: RoverAction[]) {
   const rafRef         = useRef<number | null>(null);
   const lastTickRef    = useRef<number>(0);
   const actionIdxRef   = useRef<number>(-1);
+  const tickRef        = useRef<(ts: number) => void>(() => {});
 
   // Keep refs in sync
   useEffect(() => { stateRef.current = state; }, [state]);
@@ -117,24 +165,138 @@ export function useRoverAnimation(actions: RoverAction[]) {
           row: clamp(prev.row + delta.dr, 0, GRID_SIZE - 1),
           facing: dir,
           battery: newBattery,
+          isMoving: true,
+          isDrilling: false,
         };
       }
-      case "DRILL":
-        return { ...prev, minerals: prev.minerals + 10, battery: newBattery };
+
+      case "DRILL": {
+        // Battery check
+        if (prev.battery < 15) {
+          const drillResult: DrillResult = {
+            success: false,
+            type: "regolith",
+            amount: 0,
+            remaining: 0,
+            tileCol: prev.col,
+            tileRow: prev.row,
+            message: "Drill stalled: Insufficient battery power (15% required)",
+            timestamp: Date.now(),
+          };
+          return {
+            ...prev,
+            battery: Math.max(0, prev.battery - 4),
+            isDrilling: true,
+            lastDrillResult: drillResult,
+          };
+        }
+
+        const depKey = getDepositKey(prev.col, prev.row);
+        const deposit = prev.deposits[depKey];
+
+        let drillType: MineralType = "regolith";
+        let extractedAmount = 0;
+        let remainingInDeposit = 0;
+        let msg = "";
+        const nextDeposits = { ...prev.deposits };
+
+        if (deposit && !deposit.depleted && deposit.remainingAmount > 0) {
+          drillType = deposit.type;
+          extractedAmount = Math.min(deposit.maxYieldPerDrill, deposit.remainingAmount);
+          remainingInDeposit = deposit.remainingAmount - extractedAmount;
+          nextDeposits[depKey] = {
+            ...deposit,
+            remainingAmount: remainingInDeposit,
+            depleted: remainingInDeposit <= 0,
+          };
+          const meta = MINERAL_METAS[drillType];
+          msg = remainingInDeposit <= 0
+            ? `Excavated deposit! +${extractedAmount} ${meta.shortName} (Vein depleted)`
+            : `Core drill extracted +${extractedAmount} ${meta.shortName}! (${remainingInDeposit} remaining)`;
+        } else if (deposit && deposit.depleted) {
+          drillType = "regolith";
+          extractedAmount = 2;
+          msg = `Mineral vein depleted. Extracted trace regolith (+2)`;
+        } else {
+          drillType = "regolith";
+          extractedAmount = 4;
+          msg = `Surface borehole drilled. Extracted Martian regolith (+4)`;
+        }
+
+        // Apply cargo capacity limit
+        const currentTotal = prev.minerals;
+        const capacityRoom = Math.max(0, prev.cargoCapacity - currentTotal);
+        const actualYield = Math.min(extractedAmount, capacityRoom);
+
+        const nextInventory: RoverInventory = {
+          ...prev.inventory,
+          [drillType]: prev.inventory[drillType] + actualYield,
+        };
+
+        // Track borehole crater
+        const holeIdx = prev.drilledHoles.findIndex(
+          (h) => h.col === prev.col && h.row === prev.row
+        );
+        const nextHoles = [...prev.drilledHoles];
+        if (holeIdx >= 0) {
+          nextHoles[holeIdx] = {
+            ...nextHoles[holeIdx],
+            count: nextHoles[holeIdx].count + 1,
+          };
+        } else {
+          nextHoles.push({ col: prev.col, row: prev.row, count: 1 });
+        }
+
+        const drillResult: DrillResult = {
+          success: true,
+          type: drillType,
+          amount: actualYield,
+          remaining: remainingInDeposit,
+          tileCol: prev.col,
+          tileRow: prev.row,
+          message: capacityRoom < extractedAmount ? `${msg} [Cargo Full]` : msg,
+          timestamp: Date.now(),
+        };
+
+        return {
+          ...prev,
+          battery: newBattery,
+          minerals: currentTotal + actualYield,
+          inventory: nextInventory,
+          isDrilling: true,
+          lastDrillResult: drillResult,
+          deposits: nextDeposits,
+          drilledHoles: nextHoles,
+        };
+      }
+
       case "SCAN":
-        return { ...prev, scans: prev.scans + 1, battery: newBattery };
+        return {
+          ...prev,
+          scans: prev.scans + 1,
+          battery: newBattery,
+          isDrilling: false,
+        };
+
       case "CHARGE":
-        return { ...prev, battery: clamp(prev.battery + (action.amount ?? 20), 0, 100) };
+        return {
+          ...prev,
+          battery: clamp(prev.battery + (action.amount ?? 20), 0, 100),
+          isDrilling: false,
+        };
+
       case "TURN": {
         const dir = action.turn ?? "LEFT";
         return {
           ...prev,
           facing: TURN_MAP[prev.facing][dir],
           battery: newBattery,
+          isDrilling: false,
         };
       }
+
       default:
-        return { ...prev, battery: newBattery };
+        return { ...prev, battery: newBattery, isDrilling: false };
     }
   }, []);
 
@@ -154,6 +316,7 @@ export function useRoverAnimation(actions: RoverAction[]) {
         setIsFinished(true);
         setProgress(1);
         setCurrentAction(null);
+        setState((prev) => ({ ...prev, isMoving: false, isDrilling: false }));
         return;
       }
 
@@ -172,8 +335,12 @@ export function useRoverAnimation(actions: RoverAction[]) {
       setProgress(Math.min(elapsed / actionDuration, 1));
     }
 
-    rafRef.current = requestAnimationFrame(tick);
+    rafRef.current = requestAnimationFrame((ts) => tickRef.current(ts));
   }, [applyAction]);
+
+  useEffect(() => {
+    tickRef.current = tick;
+  }, [tick]);
 
   // Start/pause playback
   const play = useCallback(() => {
@@ -181,8 +348,8 @@ export function useRoverAnimation(actions: RoverAction[]) {
     lastTickRef.current = performance.now();
     setIsPlaying(true);
     isPlayingRef.current = true;
-    rafRef.current = requestAnimationFrame(tick);
-  }, [isFinished, tick]);
+    rafRef.current = requestAnimationFrame((ts) => tickRef.current(ts));
+  }, [isFinished]);
 
   const pause = useCallback(() => {
     setIsPlaying(false);
@@ -199,14 +366,17 @@ export function useRoverAnimation(actions: RoverAction[]) {
     setIsFinished(false);
     setProgress(0);
     setCurrentAction(null);
-    const fresh = { ...INITIAL_STATE };
+    const fresh: RoverState = {
+      ...INITIAL_STATE,
+      deposits: createInitialDepositsMap(),
+    };
     setState(fresh);
     stateRef.current = fresh;
   }, [pause]);
 
   // Auto-play when new actions arrive
   useEffect(() => {
-    reset();
+    queueMicrotask(() => reset());
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [actions]);
 

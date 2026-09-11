@@ -1,6 +1,6 @@
 "use client";
 
-import { useRef, useCallback, useEffect } from "react";
+import { useRef, useCallback } from "react";
 import Editor, { OnMount } from "@monaco-editor/react";
 import type { editor, languages, Position } from "monaco-editor";
 
@@ -11,29 +11,16 @@ interface CodeEditorProps {
   readOnly?: boolean;
 }
 
-const STARTER_CODE = `# Mars Rover — Mission Control
-# ─────────────────────────────────────────────────────────────
-# Available commands:
-#   rover.drive("NORTH" | "SOUTH" | "EAST" | "WEST")
-#   rover.drill()
-#   rover.scan()
-#   rover.charge(amount=10)
-#   rover.turn_left() / rover.turn_right()
-#   rover.get_position()
-#   rover.log("your message")
-# ─────────────────────────────────────────────────────────────
-
-# Move north 3 tiles, then drill for minerals
-for i in range(3):
-    rover.drive("NORTH")
-
-rover.drill()
-rover.log("Drilling complete! Moving to survey next site.")
-
-for i in range(2):
-    rover.drive("EAST")
-
+const STARTER_CODE = `# Sector 3x3 Survey Mission (type /help in Terminal for SDK reference)
+rover.drive("NORTH")
 rover.scan()
+rover.drill()
+rover.drill()
+
+rover.drive("EAST")
+rover.drive("SOUTH")
+rover.scan()
+rover.drill()
 `;
 
 export const DEFAULT_CODE = STARTER_CODE;
@@ -126,8 +113,8 @@ export default function CodeEditor({
           return {
             suggestions: [
               mkSnippet('drive("NORTH")', 'drive("${1|NORTH,SOUTH,EAST,WEST|}")', "Move one tile in a cardinal direction"),
-              mkSnippet("drill()", "drill()", "Drill into current tile for minerals"),
-              mkSnippet("scan()", "scan()", "Scan current tile info"),
+              mkSnippet("drill()", "drill()", "Engage core drill to extract minerals & core samples"),
+              mkSnippet("scan()", "scan()", "Analyze subsurface mineral composition & reserves"),
               mkSnippet("charge()", "charge(${1:10})", "Recharge battery (needs solar tile)"),
               mkSnippet("turn_left()", "turn_left()", "Rotate rover 90° left"),
               mkSnippet("turn_right()", "turn_right()", "Rotate rover 90° right"),

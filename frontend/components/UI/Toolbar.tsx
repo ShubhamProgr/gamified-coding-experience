@@ -85,6 +85,7 @@ export default function Toolbar({
 
       {/* Run button */}
       <button
+        type="button"
         id="btn-run"
         className="btn btn--primary"
         onClick={onRun}
@@ -114,16 +115,18 @@ export default function Toolbar({
       {/* Playback controls */}
       <div style={{ display: "flex", alignItems: "center", gap: 4 }}>
         <button
+          type="button"
           id="btn-play-pause"
           className="btn btn--ghost btn--icon"
           onClick={isPlaying ? onPause : onPlay}
-          disabled={!hasActions || isFinished && !isPlaying}
+          disabled={!hasActions || (isFinished && !isPlaying)}
           title={isPlaying ? "Pause" : "Play"}
           style={{ fontSize: 16, padding: "4px 8px" }}
         >
           {isPlaying ? "⏸" : "▶"}
         </button>
         <button
+          type="button"
           id="btn-reset"
           className="btn btn--ghost btn--icon"
           onClick={onReset}
@@ -149,6 +152,7 @@ export default function Toolbar({
       >
         {SPEED_STEPS.map((s) => (
           <button
+            type="button"
             key={s.value}
             id={`btn-speed-${s.label.replace("×", "x")}`}
             onClick={() => onSpeedChange(s.value)}
@@ -201,6 +205,26 @@ export default function Toolbar({
 
       {/* Spacer */}
       <div style={{ flex: 1 }} />
+
+      {/* 3x3 Sector indicator */}
+      <div
+        style={{
+          display: "flex",
+          alignItems: "center",
+          gap: 5,
+          padding: "3px 8px",
+          borderRadius: "var(--radius-sm)",
+          background: "rgba(232,99,26,0.12)",
+          border: "1px solid rgba(232,99,26,0.3)",
+          fontSize: 11,
+          color: "var(--mars-orange)",
+          fontWeight: 600,
+          fontFamily: "var(--font-code)",
+        }}
+      >
+        <span>🗺 3×3 Sector</span>
+      </div>
+
 
       {/* Language badge */}
       <div

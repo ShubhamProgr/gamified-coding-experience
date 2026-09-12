@@ -42,6 +42,3 @@ next-env.d.ts
 
 #.env
 .env
-
-#render
-render.yaml

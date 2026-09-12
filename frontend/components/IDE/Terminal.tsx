@@ -67,18 +67,19 @@ function formatTime(ms: number): string {
 }
 
 const HELP_MESSAGE = `══════════════════════════════════════════════════════════════
-CURRENT MISSION TASK: Sector 3×3 Geological Survey
+CURRENT MISSION TASK: Sector 9×9 Geological Survey
 ══════════════════════════════════════════════════════════════
 Objectives:
-  1. Rover deployed at central Base Station (1, 1).
-  2. Navigate 1 tile NORTH to (1, 0) to detect Lithium Brine.
+  1. Rover deployed at central Base Station (4, 4).
+  2. Navigate 1 tile FRONT to (4, 3) to detect Lithium Brine.
   3. Scan subsurface vein and extract crystals with rover.drill().
-  4. Navigate EAST to (2, 1) to harvest Titanium Matrix reserves.
+  4. Navigate RIGHT & BACK to (5, 4) to harvest Titanium Matrix reserves.
+  5. Explore the expanded 9×9 sector (81 tiles) for rare Xenocrysts!
 
 ══════════════════════════════════════════════════════════════
 AVAILABLE SDK FUNCTIONS
 ══════════════════════════════════════════════════════════════
-  • rover.drive(dir)       Move 1 tile ("NORTH"|"SOUTH"|"EAST"|"WEST")
+  • rover.drive(dir)       Move 1 tile ("FRONT"|"BACK"|"RIGHT"|"LEFT")
   • rover.drill()          Extract minerals & samples at current tile
   • rover.scan()           Scan tile subsurface for veins & reserves
   • rover.charge(amt=10)   Recharge battery (+10% power)
@@ -108,7 +109,7 @@ export default function Terminal({
     {
       id: "init-banner",
       type: "system",
-      text: "Mars Rover Mission Terminal [v2.4.0-sector3x3]\nType /help for current mission task and SDK functions reference.",
+      text: "Mars Rover Mission Terminal [v2.4.0-sector9x9]\nType /help for current mission task and SDK functions reference.",
       timestamp: Date.now(),
     },
   ]);
@@ -151,8 +152,8 @@ export default function Terminal({
         },
       ]);
     } else if (cmdLower === "/task" || cmdLower === "task") {
-      const taskMsg = `Current Mission: Sector 3×3 Geological Survey
-Target: Start at (1, 1). Move NORTH to (1, 0) for Lithium Brine. Drill twice, then survey EAST to (2, 1) for Titanium Matrix.`;
+      const taskMsg = `Current Mission: Sector 9×9 Geological Survey
+Target: Start at Base Station (4, 4). Move FRONT to (4, 3) for Lithium Brine. Drill twice, then survey to (5, 4) for Titanium Matrix. Explore all 81 sector tiles!`;
       setCustomOutputs((prev) => [
         ...prev,
         userEntry,

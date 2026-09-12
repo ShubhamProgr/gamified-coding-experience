@@ -12,6 +12,7 @@ interface ToolbarProps {
   onReset: () => void;
   onRun: () => void;
   language: string;
+  onLanguageChange?: (lang: string) => void;
   totalActions: number;
   actionIndex: number;
 }
@@ -35,6 +36,7 @@ export default function Toolbar({
   onReset,
   onRun,
   language,
+  onLanguageChange,
   totalActions,
   actionIndex,
 }: ToolbarProps) {
@@ -206,7 +208,7 @@ export default function Toolbar({
       {/* Spacer */}
       <div style={{ flex: 1 }} />
 
-      {/* 3x3 Sector indicator */}
+      {/* 9x9 Sector indicator */}
       <div
         style={{
           display: "flex",
@@ -222,26 +224,44 @@ export default function Toolbar({
           fontFamily: "var(--font-code)",
         }}
       >
-        <span>🗺 3×3 Sector</span>
+        <span>🗺 9×9 Sector</span>
       </div>
 
 
-      {/* Language badge */}
+      {/* Language selector */}
       <div
         style={{
           display: "flex",
           alignItems: "center",
           gap: 6,
-          padding: "4px 10px",
+          padding: "4px 8px",
           borderRadius: "var(--radius-md)",
           background: "rgba(0,212,255,0.08)",
           border: "1px solid rgba(0,212,255,0.2)",
         }}
       >
-        <span style={{ fontSize: 12 }}>🐍</span>
-        <span style={{ fontSize: 11, fontWeight: 600, color: "var(--glow-cyan)", fontFamily: "var(--font-ui)" }}>
-          {language}
+        <span style={{ fontSize: 12 }}>
+          {language === "python" ? "🐍" : language === "cpp" ? "⚙️" : "☕"}
         </span>
+        <select
+          value={language}
+          onChange={(e) => onLanguageChange?.(e.target.value)}
+          style={{
+            fontSize: 11,
+            fontWeight: 600,
+            color: "var(--glow-cyan)",
+            fontFamily: "var(--font-ui)",
+            background: "transparent",
+            border: "none",
+            outline: "none",
+            cursor: "pointer",
+            paddingRight: 4,
+          }}
+        >
+          <option value="python" style={{ background: "#111827" }}>Python</option>
+          <option value="java" style={{ background: "#111827" }}>Java</option>
+          <option value="cpp" style={{ background: "#111827" }}>C++</option>
+        </select>
       </div>
 
       {/* Status dot */}

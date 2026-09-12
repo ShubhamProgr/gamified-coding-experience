@@ -13,14 +13,14 @@ import {
 
 export interface RoverAction {
   action: string;
-  direction?: "NORTH" | "SOUTH" | "EAST" | "WEST";
+  direction?: "FRONT" | "BACK" | "RIGHT" | "LEFT";
   turn?: "LEFT" | "RIGHT";
   amount?: number;
   message?: string;
   schema?: string;
 }
 
-export type RoverFacing = "NORTH" | "SOUTH" | "EAST" | "WEST";
+export type RoverFacing = "FRONT" | "BACK" | "RIGHT" | "LEFT";
 
 export interface DrillResult {
   success: boolean;
@@ -79,9 +79,9 @@ const BATTERY_COSTS: Record<string, number> = {
 };
 
 const INITIAL_STATE: RoverState = {
-  col: 1,
-  row: 1,
-  facing: "NORTH",
+  col: 4,
+  row: 4,
+  facing: "FRONT",
   battery: 100,
   minerals: 0,
   scans: 0,
@@ -102,20 +102,20 @@ const INITIAL_STATE: RoverState = {
 };
 
 const DIRECTION_DELTA: Record<string, { dc: number; dr: number }> = {
-  NORTH: { dc: 0,  dr: -1 },
-  SOUTH: { dc: 0,  dr: 1  },
-  EAST:  { dc: 1,  dr: 0  },
-  WEST:  { dc: -1, dr: 0  },
+  FRONT: { dc: 0,  dr: -1 },
+  BACK:  { dc: 0,  dr: 1  },
+  RIGHT: { dc: 1,  dr: 0  },
+  LEFT:  { dc: -1, dr: 0  },
 };
 
 const TURN_MAP: Record<RoverFacing, { LEFT: RoverFacing; RIGHT: RoverFacing }> = {
-  NORTH: { LEFT: "WEST",  RIGHT: "EAST"  },
-  EAST:  { LEFT: "NORTH", RIGHT: "SOUTH" },
-  SOUTH: { LEFT: "EAST",  RIGHT: "WEST"  },
-  WEST:  { LEFT: "SOUTH", RIGHT: "NORTH" },
+  FRONT: { LEFT: "LEFT",  RIGHT: "RIGHT" },
+  RIGHT: { LEFT: "FRONT", RIGHT: "BACK"  },
+  BACK:  { LEFT: "RIGHT", RIGHT: "LEFT"  },
+  LEFT:  { LEFT: "BACK",  RIGHT: "FRONT" },
 };
 
-const GRID_SIZE = 3;
+const GRID_SIZE = 9;
 
 function clamp(v: number, min: number, max: number) {
   return Math.max(min, Math.min(max, v));

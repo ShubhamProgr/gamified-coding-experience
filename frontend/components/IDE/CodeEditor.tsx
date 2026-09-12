@@ -11,19 +11,31 @@ interface CodeEditorProps {
   readOnly?: boolean;
 }
 
-const STARTER_CODE = `# Sector 3x3 Survey Mission (type /help in Terminal for SDK reference)
-rover.drive("NORTH")
-rover.scan()
-rover.drill()
-rover.drill()
-
-rover.drive("EAST")
-rover.drive("SOUTH")
-rover.scan()
-rover.drill()
-`;
-
-export const DEFAULT_CODE = STARTER_CODE;
+export const DEFAULT_CODES: Record<string, string> = {
+  python: `# Sector 9x9 Survey Mission (type /help in Terminal for SDK reference)
+for i in range(3):
+    rover.drive("FRONT")
+    rover.drill()
+`,
+  java: `public class Main {
+    public static void main(String[] args) {
+        Rover rover = new Rover();
+        for (int i = 0; i < 3; i++) {
+            rover.drive("FRONT");
+            rover.drill();
+        }
+    }
+}
+`,
+  cpp: `int main() {
+    for (int i = 0; i < 3; i++) {
+        rover.drive("FRONT");
+        rover.drill();
+    }
+    return 0;
+}
+`
+};
 
 // Custom Monaco theme matching the Mars/space palette
 const MARS_THEME: editor.IStandaloneThemeData = {
@@ -112,7 +124,7 @@ export default function CodeEditor({
 
           return {
             suggestions: [
-              mkSnippet('drive("NORTH")', 'drive("${1|NORTH,SOUTH,EAST,WEST|}")', "Move one tile in a cardinal direction"),
+              mkSnippet('drive("FRONT")', 'drive("${1|FRONT,BACK,LEFT,RIGHT|}")', "Move one tile in a directional relative axis"),
               mkSnippet("drill()", "drill()", "Engage core drill to extract minerals & core samples"),
               mkSnippet("scan()", "scan()", "Analyze subsurface mineral composition & reserves"),
               mkSnippet("charge()", "charge(${1:10})", "Recharge battery (needs solar tile)"),

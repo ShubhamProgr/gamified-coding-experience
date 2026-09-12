@@ -60,7 +60,7 @@ SDK_DIR = Path(__file__).parent / "rover_sdk"
 
 # ── Schema ─────────────────────────────────────────────────────────────────
 
-SUPPORTED_LANGUAGES = {"python"}
+SUPPORTED_LANGUAGES = {"python", "cpp", "java"}
 
 # Forbidden AST node types to block dangerous code
 BLOCKED_NODES = {
@@ -83,7 +83,7 @@ TIMEOUT_SECONDS = 5     # wall-clock limit per run
 
 class RunRequest(BaseModel):
     code: str
-    language: Literal["python"] = "python"  # extend union for future languages
+    language: Literal["python", "cpp", "java"] = "python"
 
 
 class RunResponse(BaseModel):
@@ -200,15 +200,114 @@ def _run_python(code: str) -> RunResponse:
     return RunResponse(actions=actions, error=error)
 
 
+def _run_cpp(code: str) -> RunResponse:
+    shim = '#define DEFINE_ROVER\n#include "rover.hpp"\n'
+    full_code = shim + "\n" + code
+
+    with tempfile.TemporaryDirectory() as temp_dir:
+        temp_dir_path = Path(temp_dir)
+        source_file = temp_dir_path / "main.cpp"
+        source_file.write_text(full_code, encoding="utf-8")
+        
+        executable = temp_dir_path / ("main.exe" if os.name == "nt" else "main")
+        
+        compile_res = subprocess.run(
+            ["g++", str(source_file), "-I", str(SDK_DIR), "-o", str(executable)],
+            capture_output=True,
+            text=True
+        )
+        if compile_res.returncode != 0:
+            return RunResponse(actions=[], error=f"Compilation Error:\n{compile_res.stderr.strip()}")
+            
+        try:
+            result = subprocess.run(
+                [str(executable)],
+                capture_output=True,
+                text=True,
+                timeout=TIMEOUT_SECONDS,
+            )
+        except subprocess.TimeoutExpired:
+            return RunResponse(actions=[], error=f"TimeoutError: Code exceeded the {TIMEOUT_SECONDS}s execution limit.")
+
+    actions = []
+    parse_errors = []
+    for line in result.stdout.splitlines():
+        line = line.strip()
+        if not line:
+            continue
+        try:
+            actions.append(json.loads(line))
+        except json.JSONDecodeError:
+            parse_errors.append(f"Non-JSON output: {line!r}")
+
+    if len(actions) > MAX_ACTIONS:
+        actions = actions[:MAX_ACTIONS]
+        parse_errors.append(f"Warning: action stream truncated to {MAX_ACTIONS} actions.")
+
+    error = None
+    if result.returncode != 0 and result.stderr:
+        error = result.stderr.strip()
+    elif parse_errors:
+        error = "\n".join(parse_errors)
+
+    return RunResponse(actions=actions, error=error)
+
+def _run_java(code: str) -> RunResponse:
+    with tempfile.TemporaryDirectory() as temp_dir:
+        temp_dir_path = Path(temp_dir)
+        source_file = temp_dir_path / "Main.java"
+        source_file.write_text(code, encoding="utf-8")
+        
+        compile_res = subprocess.run(
+            ["javac", "-sourcepath", str(SDK_DIR), "-d", str(temp_dir_path), str(source_file)],
+            capture_output=True,
+            text=True
+        )
+        if compile_res.returncode != 0:
+            return RunResponse(actions=[], error=f"Compilation Error:\n{compile_res.stderr.strip()}")
+            
+        try:
+            result = subprocess.run(
+                ["java", "-cp", str(temp_dir_path), "Main"],
+                capture_output=True,
+                text=True,
+                timeout=TIMEOUT_SECONDS,
+            )
+        except subprocess.TimeoutExpired:
+            return RunResponse(actions=[], error=f"TimeoutError: Code exceeded the {TIMEOUT_SECONDS}s execution limit.")
+
+    actions = []
+    parse_errors = []
+    for line in result.stdout.splitlines():
+        line = line.strip()
+        if not line:
+            continue
+        try:
+            actions.append(json.loads(line))
+        except json.JSONDecodeError:
+            parse_errors.append(f"Non-JSON output: {line!r}")
+
+    if len(actions) > MAX_ACTIONS:
+        actions = actions[:MAX_ACTIONS]
+        parse_errors.append(f"Warning: action stream truncated to {MAX_ACTIONS} actions.")
+
+    error = None
+    if result.returncode != 0 and result.stderr:
+        error = result.stderr.strip()
+    elif parse_errors:
+        error = "\n".join(parse_errors)
+
+    return RunResponse(actions=actions, error=error)
+
+
 # ── Language router ────────────────────────────────────────────────────────
 # To add a new language: add an entry here pointing to a runner function
 # that accepts a `code: str` and returns `RunResponse`.
 
 LANGUAGE_RUNNERS = {
     "python": _run_python,
-    # "javascript": _run_javascript,   # future
-    # "cpp":        _run_cpp,          # future
-    # "java":       _run_java,         # future
+    "cpp": _run_cpp,
+    "java": _run_java,
 }
 
 # ── Endpoints ──────────────────────────────────────────────────────────────

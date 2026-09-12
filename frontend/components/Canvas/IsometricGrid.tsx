@@ -1,6 +1,6 @@
 "use client";
 
-import { useRef, useEffect, useCallback } from "react";
+import { useRef, useEffect, useCallback, useState } from "react";
 import type { RoverState, RoverFacing, RoverAction } from "./useRoverAnimation";
 import {
   MineralDeposit,
@@ -11,9 +11,9 @@ import {
 
 // ── Isometric constants ────────────────────────────────────────────────────
 
-const TILE_W = 160;
-const TILE_H = 80;
-const GRID_SIZE = 3;
+export const TILE_W = 104;
+export const TILE_H = 52;
+export const GRID_SIZE = 9;
 
 // ── Tile types ─────────────────────────────────────────────────────────────
 
@@ -37,6 +37,9 @@ function seededRand(seed: number) {
 function generateMap(): Tile[][] {
   const rand = seededRand(42);
   const map: Tile[][] = [];
+  const startCol = Math.floor(GRID_SIZE / 2);
+  const startRow = Math.floor(GRID_SIZE / 2);
+
   for (let r = 0; r < GRID_SIZE; r++) {
     map[r] = [];
     for (let c = 0; c < GRID_SIZE; c++) {
@@ -44,7 +47,7 @@ function generateMap(): Tile[][] {
       let type: TileType = "sand";
       if (v > 0.85) type = "darkrock";
       else if (v > 0.65) type = "rock";
-      if (r === 1 && c === 1) type = "start";
+      if (r === startRow && c === startCol) type = "start";
       map[r][c] = { type, elevation: 0, crackCount: Math.floor(rand() * 3) };
     }
   }
@@ -101,7 +104,7 @@ function drawCrystalCluster(
 
   ctx.save();
   ctx.translate(cx, cy);
-  ctx.scale(1.6, 1.6);
+  ctx.scale(1.15, 1.15);
 
   if (isDepleted) {
     // Shattered crystal stump / excavated pit
@@ -213,7 +216,7 @@ function drawCrystalCluster(
 function drawBorehole(ctx: CanvasRenderingContext2D, cx: number, cy: number, count: number) {
   ctx.save();
   ctx.translate(cx, cy);
-  ctx.scale(1.5, 1.5);
+  ctx.scale(1.15, 1.15);
 
   // Scorched outer rim
   ctx.fillStyle = "#1e130a";
@@ -255,7 +258,7 @@ function drawTile(
   const { top, left, right } = TILE_COLORS[tile.type];
   const hw = TILE_W / 2;
   const hh = TILE_H / 2;
-  const depth = 14 + tile.elevation * 3;
+  const depth = 11 + tile.elevation * 2;
 
   // Top face (rhombus)
   ctx.beginPath();
@@ -287,11 +290,11 @@ function drawTile(
 
   // Subtle coordinate stamp on tile top face
   ctx.save();
-  ctx.font = "600 10px 'Fira Code', monospace";
-  ctx.fillStyle = highlight ? "rgba(0, 212, 255, 0.8)" : "rgba(255, 255, 255, 0.28)";
+  ctx.font = "600 8.5px 'Fira Code', monospace";
+  ctx.fillStyle = highlight ? "rgba(0, 212, 255, 0.9)" : "rgba(255, 255, 255, 0.32)";
   ctx.textAlign = "center";
   ctx.textBaseline = "middle";
-  ctx.fillText(`(${col},${row})`, sx + hw, sy - hh + 14);
+  ctx.fillText(`(${col},${row})`, sx + hw, sy - hh + 11);
   ctx.restore();
 
   // Left face
@@ -322,11 +325,11 @@ function drawTile(
     ctx.strokeStyle = "rgba(0,0,0,0.22)";
     ctx.lineWidth = 0.7;
     for (let i = 0; i < tile.crackCount; i++) {
-      const ox = sx + hw * 0.4 + ((i * 32) % (TILE_W * 0.7));
-      const oy = sy - hh * 0.2 + i * 5;
+      const ox = sx + hw * 0.4 + ((i * 24) % (TILE_W * 0.7));
+      const oy = sy - hh * 0.2 + i * 4;
       ctx.beginPath();
       ctx.moveTo(ox, oy);
-      ctx.lineTo(ox + 10 + i * 2, oy + 4 + i);
+      ctx.lineTo(ox + 8 + i * 2, oy + 3 + i);
       ctx.stroke();
     }
   }
@@ -341,15 +344,21 @@ function drawTile(
     drawCrystalCluster(ctx, cx, cy, deposit, time);
   }
 
-  // Start tile marker (Center base station)
-  if (tile.type === "start" || (col === 1 && row === 1)) {
+  // Start tile marker (Center base station at 4, 4)
+  const isStartSite = tile.type === "start" || (col === Math.floor(GRID_SIZE / 2) && row === Math.floor(GRID_SIZE / 2));
+  if (isStartSite) {
     ctx.save();
     ctx.beginPath();
-    ctx.ellipse(cx, cy, 18, 9, 0, 0, Math.PI * 2);
-    ctx.strokeStyle = "rgba(0,212,255,0.4)";
+    ctx.ellipse(cx, cy, 15, 7.5, 0, 0, Math.PI * 2);
+    ctx.strokeStyle = "rgba(0,212,255,0.6)";
     ctx.lineWidth = 1.5;
-    ctx.setLineDash([4, 4]);
+    ctx.setLineDash([4, 3]);
     ctx.stroke();
+
+    ctx.beginPath();
+    ctx.arc(cx, cy, 2.5, 0, Math.PI * 2);
+    ctx.fillStyle = "rgba(0,212,255,0.85)";
+    ctx.fill();
     ctx.restore();
   }
 }
@@ -370,17 +379,17 @@ function drawRover(
   const hw = TILE_W / 2;
   // Rover body center relative to tile top-center
   let cx = sx + hw;
-  let cy = sy - 4;
+  let cy = sy - 3;
 
   // Mechanical vibration shake when active drill
   if (isDrilling) {
-    cx += (Math.sin(time * 0.08) + Math.cos(time * 0.13)) * 2;
-    cy += (Math.cos(time * 0.09) - Math.sin(time * 0.11)) * 1.5;
+    cx += (Math.sin(time * 0.08) + Math.cos(time * 0.13)) * 1.5;
+    cy += (Math.cos(time * 0.09) - Math.sin(time * 0.11)) * 1.2;
   }
 
   ctx.save();
   ctx.translate(cx, cy);
-  ctx.scale(1.5, 1.5);
+  ctx.scale(1.15, 1.15);
 
   // Battery glow color
   const batteryColor =
@@ -449,10 +458,10 @@ function drawRover(
 
   // Facing arrow indicator
   const arrowAngles: Record<RoverFacing, number> = {
-    NORTH: -Math.PI / 4,
-    EAST:  Math.PI / 4,
-    SOUTH: (3 * Math.PI) / 4,
-    WEST:  (-3 * Math.PI) / 4,
+    FRONT: -Math.PI / 4,
+    RIGHT: Math.PI / 4,
+    BACK: (3 * Math.PI) / 4,
+    LEFT: (-3 * Math.PI) / 4,
   };
   const angle = arrowAngles[facing];
   ctx.save();
@@ -612,12 +621,18 @@ export default function IsometricGrid({
   const prevPosRef = useRef({ col: roverState.col, row: roverState.row });
   const rafRef = useRef<number | null>(null);
 
-  // Track trail
+  // Pan and Zoom camera state for 9x9 exploration
+  const [zoom, setZoom] = useState(1.0);
+  const [pan, setPan] = useState({ x: 0, y: 0 });
+  const [isDragging, setIsDragging] = useState(false);
+  const dragStartRef = useRef({ x: 0, y: 0, panX: 0, panY: 0 });
+
+  // Track trail (keep up to 32 historical steps across 9x9 sector)
   useEffect(() => {
     const prev = prevPosRef.current;
     if (prev.col !== roverState.col || prev.row !== roverState.row) {
       trailRef.current = [
-        ...trailRef.current.slice(-12),
+        ...trailRef.current.slice(-32),
         { col: prev.col, row: prev.row },
       ];
       prevPosRef.current = { col: roverState.col, row: roverState.row };
@@ -644,7 +659,7 @@ export default function IsometricGrid({
     ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
     ctx.clearRect(0, 0, w, h);
 
-    // Space background
+    // Space background (stays static in cosmic space)
     const bgGrad = ctx.createRadialGradient(w / 2, h / 2, 0, w / 2, h / 2, Math.max(w, h));
     bgGrad.addColorStop(0, "#0d1523");
     bgGrad.addColorStop(1, "#07090f");
@@ -665,8 +680,21 @@ export default function IsometricGrid({
       ctx.fill();
     });
 
-    const originX = w / 2;
-    const originY = h / 2 - TILE_H;
+    // ── Planetary Surface World Transform ──
+    // Center of 9x9 grid is at row 4, col 4
+    const originX = w / 2 - TILE_W / 2;
+    const originY = h / 2 - ((GRID_SIZE - 1) / 2) * TILE_H;
+
+    const gridW = GRID_SIZE * TILE_W;
+    const gridH = GRID_SIZE * TILE_H + 40;
+    const padding = 36;
+    const autoScale = Math.min(1.0, Math.max(0.4, Math.min((w - padding) / gridW, (h - padding) / gridH)));
+    const totalScale = autoScale * zoom;
+
+    ctx.save();
+    ctx.translate(w / 2 + pan.x, h / 2 + pan.y);
+    ctx.scale(totalScale, totalScale);
+    ctx.translate(-w / 2, -h / 2);
 
     // Drilled holes map lookup
     const holesMap = new Map<string, number>();
@@ -674,7 +702,7 @@ export default function IsometricGrid({
       holesMap.set(getDepositKey(hItem.col, hItem.row), hItem.count);
     }
 
-    // Draw all tiles (Painter's sort: back to front)
+    // Draw all 9x9 tiles (Painter's sort: back to front)
     for (let r = 0; r < GRID_SIZE; r++) {
       for (let c = 0; c < GRID_SIZE; c++) {
         const tile = MAP[r][c];
@@ -709,13 +737,13 @@ export default function IsometricGrid({
     const lerpX = prevSx + (curSx - prevSx) * progress;
     const lerpY = prevSy + (curSy - prevSy) * progress;
 
-    const roverTile = MAP[roverState.row][roverState.col];
+    const roverTile = MAP[roverState.row]?.[roverState.col] ?? MAP[0][0];
     const isDrillingAction = currentAction?.action === "DRILL" || roverState.isDrilling;
 
     drawRover(
       ctx,
       lerpX,
-      lerpY - roverTile.elevation * 5,
+      lerpY - roverTile.elevation * 4,
       roverState.facing,
       roverState.battery,
       isDrillingAction,
@@ -723,7 +751,9 @@ export default function IsometricGrid({
       time,
       roverState.lastDrillResult
     );
-  }, [roverState, progress, currentAction]);
+
+    ctx.restore();
+  }, [roverState, progress, currentAction, zoom, pan]);
 
   // Animation loop
   useEffect(() => {
@@ -744,17 +774,129 @@ export default function IsometricGrid({
     return () => obs.disconnect();
   }, [draw]);
 
+  // Mouse drag & zoom handlers for map exploration
+  const handlePointerDown = (e: React.PointerEvent<HTMLDivElement>) => {
+    if (e.button !== 0) return;
+    setIsDragging(true);
+    dragStartRef.current = {
+      x: e.clientX,
+      y: e.clientY,
+      panX: pan.x,
+      panY: pan.y,
+    };
+    try {
+      e.currentTarget.setPointerCapture(e.pointerId);
+    } catch {}
+  };
+
+  const handlePointerMove = (e: React.PointerEvent<HTMLDivElement>) => {
+    if (!isDragging) return;
+    const dx = e.clientX - dragStartRef.current.x;
+    const dy = e.clientY - dragStartRef.current.y;
+    setPan({
+      x: dragStartRef.current.panX + dx,
+      y: dragStartRef.current.panY + dy,
+    });
+  };
+
+  const handlePointerUp = (e: React.PointerEvent<HTMLDivElement>) => {
+    if (isDragging) {
+      setIsDragging(false);
+      try {
+        e.currentTarget.releasePointerCapture(e.pointerId);
+      } catch {}
+    }
+  };
+
+  const handleWheel = (e: React.WheelEvent<HTMLDivElement>) => {
+    e.preventDefault();
+    const factor = e.deltaY < 0 ? 1.12 : 0.89;
+    setZoom((prev) => Math.min(2.5, Math.max(0.45, Number((prev * factor).toFixed(2)))));
+  };
+
+  const handleZoomIn = (e: React.MouseEvent) => {
+    e.stopPropagation();
+    setZoom((prev) => Math.min(2.5, Number((prev + 0.15).toFixed(2))));
+  };
+
+  const handleZoomOut = (e: React.MouseEvent) => {
+    e.stopPropagation();
+    setZoom((prev) => Math.max(0.45, Number((prev - 0.15).toFixed(2))));
+  };
+
+  const handleResetView = (e: React.MouseEvent) => {
+    e.stopPropagation();
+    setZoom(1.0);
+    setPan({ x: 0, y: 0 });
+  };
+
+  const handleCenterRover = (e: React.MouseEvent) => {
+    e.stopPropagation();
+    if (!containerRef.current) return;
+    const w = containerRef.current.clientWidth;
+    const h = containerRef.current.clientHeight;
+    const originX = w / 2 - TILE_W / 2;
+    const originY = h / 2 - ((GRID_SIZE - 1) / 2) * TILE_H;
+    const { x: curSx, y: curSy } = isoToScreen(roverState.col, roverState.row, originX, originY);
+    const roverCenterX = curSx + TILE_W / 2;
+    const roverCenterY = curSy;
+    setPan({
+      x: (w / 2) - roverCenterX,
+      y: (h / 2) - roverCenterY,
+    });
+  };
+
   // Check deposit under rover
   const currentTileDeposit = roverState.deposits[getDepositKey(roverState.col, roverState.row)];
 
   return (
-    <div ref={containerRef} style={{ width: "100%", height: "100%", position: "relative" }}>
+    <div
+      ref={containerRef}
+      onPointerDown={handlePointerDown}
+      onPointerMove={handlePointerMove}
+      onPointerUp={handlePointerUp}
+      onWheel={handleWheel}
+      style={{
+        width: "100%",
+        height: "100%",
+        position: "relative",
+        cursor: isDragging ? "grabbing" : "grab",
+        userSelect: "none",
+        touchAction: "none",
+      }}
+    >
       <canvas
         ref={canvasRef}
         style={{ display: "block", width: "100%", height: "100%" }}
       />
 
-      {/* Coordinate & Subsurface Sensor overlay */}
+      {/* Top Left: Sector & Exploration Badge */}
+      <div
+        style={{
+          position: "absolute",
+          top: 12,
+          left: 12,
+          display: "flex",
+          alignItems: "center",
+          gap: 8,
+          padding: "5px 12px",
+          borderRadius: "var(--radius-md)",
+          background: "rgba(7,9,15,0.85)",
+          border: "1px solid var(--space-border)",
+          fontFamily: "var(--font-code)",
+          fontSize: 11,
+          color: "var(--text-secondary)",
+          backdropFilter: "blur(8px)",
+          boxShadow: "0 4px 16px rgba(0,0,0,0.4)",
+          pointerEvents: "none",
+        }}
+      >
+        <span style={{ color: "var(--mars-orange)", fontWeight: 700 }}>🗺 Sector 9×9</span>
+        <span style={{ color: "rgba(255,255,255,0.3)" }}>|</span>
+        <span>81 Surface Tiles</span>
+      </div>
+
+      {/* Bottom Left: Coordinate & Subsurface Sensor overlay */}
       <div
         style={{
           position: "absolute",
@@ -772,6 +914,7 @@ export default function IsometricGrid({
           color: "var(--glow-cyan)",
           backdropFilter: "blur(8px)",
           boxShadow: "0 4px 16px rgba(0,0,0,0.4)",
+          pointerEvents: "none",
         }}
       >
         <span>
@@ -795,7 +938,109 @@ export default function IsometricGrid({
         )}
       </div>
 
-      {/* Playing / Action indicator */}
+      {/* Bottom Right: Map Navigation & Camera Controls */}
+      <div
+        style={{
+          position: "absolute",
+          bottom: 12,
+          right: 12,
+          display: "flex",
+          alignItems: "center",
+          gap: 4,
+          padding: "3px",
+          borderRadius: "var(--radius-md)",
+          background: "rgba(7,9,15,0.85)",
+          border: "1px solid var(--space-border)",
+          backdropFilter: "blur(8px)",
+          boxShadow: "0 4px 16px rgba(0,0,0,0.4)",
+          zIndex: 5,
+        }}
+      >
+        <button
+          type="button"
+          onClick={handleZoomIn}
+          title="Zoom In"
+          style={{
+            width: 28,
+            height: 28,
+            background: "rgba(255,255,255,0.06)",
+            border: "1px solid rgba(255,255,255,0.1)",
+            borderRadius: "var(--radius-sm)",
+            color: "var(--text-primary)",
+            fontSize: 14,
+            fontWeight: 700,
+            cursor: "pointer",
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "center",
+          }}
+        >
+          +
+        </button>
+        <button
+          type="button"
+          onClick={handleZoomOut}
+          title="Zoom Out"
+          style={{
+            width: 28,
+            height: 28,
+            background: "rgba(255,255,255,0.06)",
+            border: "1px solid rgba(255,255,255,0.1)",
+            borderRadius: "var(--radius-sm)",
+            color: "var(--text-primary)",
+            fontSize: 14,
+            fontWeight: 700,
+            cursor: "pointer",
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "center",
+          }}
+        >
+          −
+        </button>
+        <button
+          type="button"
+          onClick={handleCenterRover}
+          title="Center on Rover"
+          style={{
+            width: 28,
+            height: 28,
+            background: "rgba(255,255,255,0.06)",
+            border: "1px solid rgba(255,255,255,0.1)",
+            borderRadius: "var(--radius-sm)",
+            color: "var(--glow-cyan)",
+            fontSize: 12,
+            cursor: "pointer",
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "center",
+          }}
+        >
+          🎯
+        </button>
+        <button
+          type="button"
+          onClick={handleResetView}
+          title="Reset View"
+          style={{
+            width: 28,
+            height: 28,
+            background: "rgba(255,255,255,0.06)",
+            border: "1px solid rgba(255,255,255,0.1)",
+            borderRadius: "var(--radius-sm)",
+            color: "var(--text-muted)",
+            fontSize: 12,
+            cursor: "pointer",
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "center",
+          }}
+        >
+          ⟲
+        </button>
+      </div>
+
+      {/* Top Right: Playing / Action indicator */}
       {isPlaying && (
         <div
           style={{
@@ -819,6 +1064,7 @@ export default function IsometricGrid({
               : "var(--glow-green)",
             backdropFilter: "blur(8px)",
             boxShadow: "0 4px 16px rgba(0,0,0,0.4)",
+            pointerEvents: "none",
           }}
         >
           <div

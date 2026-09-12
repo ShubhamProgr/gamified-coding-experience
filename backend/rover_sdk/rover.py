@@ -27,11 +27,11 @@ class Rover:
 
     Example usage:
         rover = Rover()
-        rover.drive("NORTH")
+        rover.drive("FRONT")
         rover.drill()
     """
 
-    VALID_DIRECTIONS = {"NORTH", "SOUTH", "EAST", "WEST"}
+    VALID_DIRECTIONS = {"FRONT", "BACK", "RIGHT", "LEFT"}
 
     def drive(self, direction: str) -> None:
         """Move the rover one tile in the given cardinal direction."""

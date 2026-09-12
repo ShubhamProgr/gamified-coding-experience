@@ -8,7 +8,7 @@ import Toolbar from "@/components/UI/Toolbar";
 import Terminal, { LogEntry } from "@/components/IDE/Terminal";
 import IsometricGrid from "@/components/Canvas/IsometricGrid";
 import { useRoverAnimation, RoverAction } from "@/components/Canvas/useRoverAnimation";
-import { DEFAULT_CODE } from "@/components/IDE/CodeEditor";
+import { DEFAULT_CODES } from "@/components/IDE/CodeEditor";
 
 // Monaco must be loaded client-side only (no SSR)
 const CodeEditor = dynamic(() => import("@/components/IDE/CodeEditor"), {
@@ -62,8 +62,13 @@ function actionToMessage(action: RoverAction): string {
 }
 
 export default function Home() {
-  const [code, setCode] = useState(DEFAULT_CODE);
-  const [language] = useState("python");
+  const [language, setLanguage] = useState("python");
+  const [code, setCode] = useState(DEFAULT_CODES["python"]);
+
+  const handleLanguageChange = useCallback((lang: string) => {
+    setLanguage(lang);
+    setCode(DEFAULT_CODES[lang]);
+  }, []);
   const [isRunning, setIsRunning] = useState(false);
   const [actions, setActions] = useState<RoverAction[]>([]);
   const [logs, setLogs] = useState<LogEntry[]>([]);
@@ -202,6 +207,7 @@ export default function Home() {
         onReset={reset}
         onRun={handleRun}
         language={language}
+        onLanguageChange={handleLanguageChange}
         totalActions={totalActions}
         actionIndex={roverState.actionIndex}
       />
@@ -262,8 +268,8 @@ export default function Home() {
                   cursor: "pointer",
                 }}
               >
-                <span>🐍</span>
-                <span>mission.py</span>
+                <span>{language === "python" ? "🐍" : language === "cpp" ? "⚙️" : "☕"}</span>
+                <span>{language === "python" ? "mission.py" : language === "cpp" ? "main.cpp" : "Main.java"}</span>
               </button>
 
               <button
@@ -361,7 +367,7 @@ export default function Home() {
           </div>
         </div>
 
-        {/* FULLSCREEN BACKGROUND 3X3 CANVAS */}
+        {/* FULLSCREEN BACKGROUND 9X9 CANVAS */}
         <div style={{ flex: 1, width: "100%", height: "100%", position: "relative" }}>
           <IsometricGrid
             roverState={roverState}

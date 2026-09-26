@@ -105,11 +105,11 @@ export default function Terminal({
   const [inputVal, setInputVal] = useState("");
   const [history, setHistory] = useState<string[]>([]);
   const [historyIdx, setHistoryIdx] = useState(-1);
-  const [customOutputs, setCustomOutputs] = useState<CommandOutput[]>([
+  const [customOutputs, setCustomOutputs] = useState<CommandOutput[]>(() => [
     {
       id: "init-banner",
       type: "system",
-      text: "Mars Rover Mission Terminal [v2.4.0-sector9x9]\nType /help for current mission task and SDK functions reference.",
+      text: "Mars Rover Mission Terminal [v2.4.0-sector15x15]\nType /help for current mission task and SDK functions reference.",
       timestamp: Date.now(),
     },
   ]);

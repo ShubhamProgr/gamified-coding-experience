@@ -4,11 +4,15 @@ import { useState, useCallback, useRef, useEffect } from "react";
 import dynamic from "next/dynamic";
 
 import Toolbar from "@/components/UI/Toolbar";
-
 import Terminal, { LogEntry } from "@/components/IDE/Terminal";
 import IsometricGrid from "@/components/Canvas/IsometricGrid";
 import { useRoverAnimation, RoverAction } from "@/components/Canvas/useRoverAnimation";
 import { DEFAULT_CODES } from "@/components/IDE/CodeEditor";
+import RoundBanner from "@/components/rounds/RoundBanner";
+import RoundCompleteModal from "@/components/rounds/RoundCompleteModal";
+import VictoryScreen from "@/components/rounds/VictoryScreen";
+import { useRoundManager } from "@/components/rounds/useRoundManager";
+import { ROUNDS } from "@/components/rounds/roundsConfig";
 
 // Monaco must be loaded client-side only (no SSR)
 const CodeEditor = dynamic(() => import("@/components/IDE/CodeEditor"), {
@@ -76,6 +80,20 @@ export default function Home() {
   // Layout states
   const [activeTab, setActiveTab] = useState<"code" | "console">("code");
 
+  // ── Round Manager ────────────────────────────────────────────────────────
+  const {
+    state: roundState,
+    currentRoundConfig,
+    getDepositsForRound,
+    handleRoundFinished,
+    advanceRound,
+    dismissModal,
+    resetAll,
+  } = useRoundManager();
+
+  // Compute per-round deposits for the animation hook
+  const currentRoundDeposits = getDepositsForRound(roundState.currentRound);
+
   const {
     roverState,
     isPlaying,
@@ -88,9 +106,35 @@ export default function Home() {
     pause,
     reset,
     totalActions,
-  } = useRoverAnimation(actions);
+  } = useRoverAnimation(
+    actions,
+    currentRoundConfig.radiationZones,
+    roundState.persistentBattery,
+    roundState.persistentInventory,
+    currentRoundDeposits
+  );
 
-  // Append a log entry
+  // ── Round completion detection ────────────────────────────────────────────
+  // Fire once when animation finishes and we haven't already reported this run
+  const finishedReportedRef = useRef(false);
+
+  useEffect(() => {
+    if (isFinished && !finishedReportedRef.current && actions.length > 0) {
+      finishedReportedRef.current = true;
+      handleRoundFinished(
+        roverState.minerals,
+        roverState.battery,
+        roverState.inventory
+      );
+    }
+  }, [isFinished, actions.length, roverState.minerals, roverState.battery, roverState.inventory, handleRoundFinished]);
+
+  // Reset the "finished reported" flag each time a new run starts
+  useEffect(() => {
+    finishedReportedRef.current = false;
+  }, [actions]);
+
+  // ── Append a log entry ────────────────────────────────────────────────────
   const appendLog = useCallback((entry: Omit<LogEntry, "id" | "timestamp">) => {
     setLogs((prev) => [
       ...prev,
@@ -98,7 +142,7 @@ export default function Home() {
     ]);
   }, []);
 
-  // Run the player's code
+  // ── Run the player's code ─────────────────────────────────────────────────
   const handleRun = useCallback(async () => {
     if (isRunning) return;
     setIsRunning(true);
@@ -146,7 +190,7 @@ export default function Home() {
     }
   }, [code, language, isRunning, reset, appendLog, play]);
 
-  // Log new actions as they play
+  // ── Log new actions as they play ──────────────────────────────────────────
   useEffect(() => {
     if (!currentAction) return;
     let msg = actionToMessage(currentAction);
@@ -171,7 +215,7 @@ export default function Home() {
     });
   }, [currentAction, appendLog, roverState.lastDrillResult, roverState.deposits, roverState.col, roverState.row]);
 
-  // Keyboard shortcut: Ctrl+Enter to run
+  // ── Keyboard shortcut: Ctrl+Enter to run ─────────────────────────────────
   useEffect(() => {
     const handler = (e: KeyboardEvent) => {
       if ((e.ctrlKey || e.metaKey) && e.key === "Enter") {
@@ -183,6 +227,23 @@ export default function Home() {
     return () => window.removeEventListener("keydown", handler);
   }, [handleRun]);
 
+  // ── Handle advancing to next round ────────────────────────────────────────
+  const handleAdvanceRound = useCallback(() => {
+    advanceRound();
+    setActions([]);
+    setLogs([]);
+    reset();
+    finishedReportedRef.current = false;
+  }, [advanceRound, reset]);
+
+  // ── Handle full restart ───────────────────────────────────────────────────
+  const handleRestart = useCallback(() => {
+    resetAll();
+    setActions([]);
+    setLogs([]);
+    reset();
+    finishedReportedRef.current = false;
+  }, [resetAll, reset]);
 
   return (
     <div
@@ -210,6 +271,15 @@ export default function Home() {
         onLanguageChange={handleLanguageChange}
         totalActions={totalActions}
         actionIndex={roverState.actionIndex}
+      />
+
+      {/* Round objective banner */}
+      <RoundBanner
+        roundConfig={currentRoundConfig}
+        cumulativeMinerals={roundState.cumulativeMinerals + roverState.minerals}
+        currentRoundMinerals={roverState.minerals}
+        starsEarned={roundState.starsEarned}
+        battery={roverState.battery}
       />
 
       {/* Main visual workspace */}
@@ -374,9 +444,36 @@ export default function Home() {
             isPlaying={isPlaying}
             progress={progress}
             currentAction={currentAction}
+            radiationZones={currentRoundConfig.radiationZones}
           />
         </div>
       </div>
+
+      {/* Round Complete Modal */}
+      {roundState.showCompleteModal && roundState.currentRound < 3 && (
+        <RoundCompleteModal
+          roundConfig={currentRoundConfig}
+          nextRoundConfig={ROUNDS[roundState.currentRound]} // currentRound is already advanced in state? No — advance happens on button click
+          stars={roundState.starsEarned[roundState.currentRound - 1]}
+          cumulativeMinerals={roundState.cumulativeMinerals}
+          battery={roundState.persistentBattery}
+          inventory={roundState.persistentInventory}
+          mineralTarget={currentRoundConfig.mineralTarget}
+          onAdvance={handleAdvanceRound}
+          onDismiss={dismissModal}
+        />
+      )}
+
+      {/* Victory Screen */}
+      {roundState.showVictoryScreen && (
+        <VictoryScreen
+          starsEarned={roundState.starsEarned}
+          cumulativeMinerals={roundState.cumulativeMinerals}
+          inventory={roundState.persistentInventory}
+          battery={roundState.persistentBattery}
+          onRestart={handleRestart}
+        />
+      )}
     </div>
   );
 }

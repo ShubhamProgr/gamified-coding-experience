@@ -8,16 +8,17 @@ import {
   getDepositKey,
   INITIAL_DEPOSIT_CONFIGS,
 } from "./minerals";
+import type { RadiationZone } from "../rounds/roundsConfig";
+import { GRID_SIZE, MAP_MASK } from "./mapConfig";
 
 // ── Isometric constants ────────────────────────────────────────────────────
 
 export const TILE_W = 104;
 export const TILE_H = 52;
-export const GRID_SIZE = 9;
 
 // ── Tile types ─────────────────────────────────────────────────────────────
 
-type TileType = "sand" | "rock" | "darkrock" | "mineral" | "start";
+type TileType = "sand" | "rock" | "darkrock" | "mineral" | "start" | "void";
 
 interface Tile {
   type: TileType;
@@ -37,25 +38,34 @@ function seededRand(seed: number) {
 function generateMap(): Tile[][] {
   const rand = seededRand(42);
   const map: Tile[][] = [];
-  const startCol = Math.floor(GRID_SIZE / 2);
-  const startRow = Math.floor(GRID_SIZE / 2);
+  const startCol = 7;
+  const startRow = 7;
 
   for (let r = 0; r < GRID_SIZE; r++) {
     map[r] = [];
     for (let c = 0; c < GRID_SIZE; c++) {
+      if (MAP_MASK[r][c] === 0) {
+        map[r][c] = { type: "void", elevation: 0, crackCount: 0 };
+        continue;
+      }
+
       const v = rand();
       let type: TileType = "sand";
       if (v > 0.85) type = "darkrock";
       else if (v > 0.65) type = "rock";
+      
       if (r === startRow && c === startCol) type = "start";
-      map[r][c] = { type, elevation: 0, crackCount: Math.floor(rand() * 3) };
+      
+      map[r][c] = { type, elevation: Math.floor(rand() * 2), crackCount: Math.floor(rand() * 3) };
     }
   }
 
   // Stamp configured mineral deposit tiles
   for (const dep of INITIAL_DEPOSIT_CONFIGS) {
     if (dep.row >= 0 && dep.row < GRID_SIZE && dep.col >= 0 && dep.col < GRID_SIZE) {
-      map[dep.row][dep.col].type = "mineral";
+      if (map[dep.row][dep.col].type !== "void") {
+        map[dep.row][dep.col].type = "mineral";
+      }
     }
   }
 
@@ -72,6 +82,7 @@ const TILE_COLORS: Record<TileType, { top: string; left: string; right: string }
   darkrock: { top: "#5a3a25", left: "#3a2010", right: "#2a1508" },
   mineral:  { top: "#3a564c", left: "#243d34", right: "#1a2c25" },
   start:    { top: "#c4956a", left: "#a07550", right: "#8a6040" },
+  void:     { top: "transparent", left: "transparent", right: "transparent" },
 };
 
 // ── Coordinate transforms ──────────────────────────────────────────────────
@@ -211,6 +222,57 @@ function drawCrystalCluster(
   ctx.restore();
 }
 
+// ── Radiation Zone Drawing ─────────────────────────────────────────────────
+
+function drawRadiationZone(
+  ctx: CanvasRenderingContext2D,
+  sx: number,
+  sy: number,
+  time: number
+) {
+  const hw = TILE_W / 2;
+  const hh = TILE_H / 2;
+  const pulse = 0.5 + 0.5 * Math.sin(time * 0.004);
+
+  ctx.save();
+
+  // Pulsing pink-red tint over tile top face
+  ctx.beginPath();
+  ctx.moveTo(sx, sy);
+  ctx.lineTo(sx + hw, sy + hh);
+  ctx.lineTo(sx + TILE_W, sy);
+  ctx.lineTo(sx + hw, sy - hh);
+  ctx.closePath();
+  ctx.fillStyle = `rgba(251, 113, 133, ${0.12 + pulse * 0.12})`;
+  ctx.fill();
+
+  // Dashed border
+  ctx.strokeStyle = `rgba(251, 113, 133, ${0.5 + pulse * 0.4})`;
+  ctx.lineWidth = 1.5;
+  ctx.setLineDash([5, 4]);
+  ctx.beginPath();
+  ctx.moveTo(sx, sy);
+  ctx.lineTo(sx + hw, sy + hh);
+  ctx.lineTo(sx + TILE_W, sy);
+  ctx.lineTo(sx + hw, sy - hh);
+  ctx.closePath();
+  ctx.stroke();
+  ctx.setLineDash([]);
+
+  // ☢ symbol
+  const cx = sx + hw;
+  const cy = sy - hh / 2 + 2;
+  ctx.font = `bold ${11 + pulse * 2}px sans-serif`;
+  ctx.textAlign = "center";
+  ctx.textBaseline = "middle";
+  ctx.shadowBlur = 8 + pulse * 8;
+  ctx.shadowColor = "rgba(251,113,133,0.8)";
+  ctx.fillStyle = `rgba(251,113,133,${0.7 + pulse * 0.3})`;
+  ctx.fillText("☢", cx, cy);
+
+  ctx.restore();
+}
+
 // ── Borehole / Excavation Crater ────────────────────────────────────────────
 
 function drawBorehole(ctx: CanvasRenderingContext2D, cx: number, cy: number, count: number) {
@@ -255,6 +317,8 @@ function drawTile(
   drilledCount?: number,
   time = 0
 ) {
+  if (tile.type === "void") return;
+
   const { top, left, right } = TILE_COLORS[tile.type];
   const hw = TILE_W / 2;
   const hh = TILE_H / 2;
@@ -607,6 +671,7 @@ interface IsometricGridProps {
   isPlaying: boolean;
   progress: number;
   currentAction?: RoverAction | null;
+  radiationZones?: RadiationZone[];
 }
 
 export default function IsometricGrid({
@@ -614,6 +679,7 @@ export default function IsometricGrid({
   isPlaying,
   progress,
   currentAction,
+  radiationZones = [],
 }: IsometricGridProps) {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const containerRef = useRef<HTMLDivElement>(null);
@@ -726,6 +792,12 @@ export default function IsometricGrid({
           drilledCount,
           time
         );
+
+        // Draw radiation zone overlay on top of the tile
+        const isRadiation = radiationZones.some((z) => z.col === c && z.row === r);
+        if (isRadiation) {
+          drawRadiationZone(ctx, sx, sy, time);
+        }
       }
     }
 
@@ -753,7 +825,7 @@ export default function IsometricGrid({
     );
 
     ctx.restore();
-  }, [roverState, progress, currentAction, zoom, pan]);
+  }, [roverState, progress, currentAction, zoom, pan, radiationZones]);
 
   // Animation loop
   useEffect(() => {

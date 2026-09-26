@@ -105,45 +105,48 @@ export function getDepositKey(col: number, row: number): string {
 // Start position is central Base Station: col 4, row 4.
 // 1 step North (col 4, row 3) is Lithium Brine (starter mission).
 // 1 step East then South (col 5, row 4) is Titanium Matrix (starter mission).
-export const INITIAL_DEPOSIT_CONFIGS: Omit<MineralDeposit, "depleted">[] = [
+export const INITIAL_DEPOSIT_CONFIGS: (Omit<MineralDeposit, "depleted"> & { remainingAmount: number })[] = [
   // ── Central Survey Quadrant (adjacent to base station at 4, 4) ──
-  { id: "dep-1",  col: 4, row: 3, type: "lithium",   totalAmount: 60,  remainingAmount: 60,  maxYieldPerDrill: 30 },
-  { id: "dep-2",  col: 5, row: 4, type: "titanium",  totalAmount: 60,  remainingAmount: 60,  maxYieldPerDrill: 30 },
-  { id: "dep-3",  col: 3, row: 4, type: "hematite",  totalAmount: 70,  remainingAmount: 70,  maxYieldPerDrill: 35 },
-  { id: "dep-4",  col: 5, row: 5, type: "xenocryst", totalAmount: 50,  remainingAmount: 50,  maxYieldPerDrill: 25 },
-  { id: "dep-5",  col: 3, row: 3, type: "xenocryst", totalAmount: 50,  remainingAmount: 50,  maxYieldPerDrill: 25 },
-  { id: "dep-6",  col: 4, row: 5, type: "hematite",  totalAmount: 60,  remainingAmount: 60,  maxYieldPerDrill: 30 },
+  { id: "dep-1",  col: 7, row: 6, type: "lithium",   totalAmount: 60,  remainingAmount: 60,  maxYieldPerDrill: 30 },
+  { id: "dep-2",  col: 8, row: 7, type: "titanium",  totalAmount: 60,  remainingAmount: 60,  maxYieldPerDrill: 30 },
+  { id: "dep-3",  col: 6, row: 7, type: "hematite",  totalAmount: 70,  remainingAmount: 70,  maxYieldPerDrill: 35 },
+  { id: "dep-4",  col: 8, row: 8, type: "xenocryst", totalAmount: 50,  remainingAmount: 50,  maxYieldPerDrill: 25 },
+  { id: "dep-5",  col: 6, row: 6, type: "xenocryst", totalAmount: 50,  remainingAmount: 50,  maxYieldPerDrill: 25 },
+  { id: "dep-6",  col: 7, row: 8, type: "hematite",  totalAmount: 60,  remainingAmount: 60,  maxYieldPerDrill: 30 },
 
   // ── North Sector ──
-  { id: "dep-7",  col: 2, row: 1, type: "lithium",   totalAmount: 80,  remainingAmount: 80,  maxYieldPerDrill: 40 },
-  { id: "dep-8",  col: 6, row: 1, type: "titanium",  totalAmount: 70,  remainingAmount: 70,  maxYieldPerDrill: 35 },
-  { id: "dep-9",  col: 4, row: 1, type: "xenocryst", totalAmount: 60,  remainingAmount: 60,  maxYieldPerDrill: 30 },
+  { id: "dep-7",  col: 5, row: 4, type: "lithium",   totalAmount: 80,  remainingAmount: 80,  maxYieldPerDrill: 40 },
+  { id: "dep-8",  col: 9, row: 4, type: "titanium",  totalAmount: 70,  remainingAmount: 70,  maxYieldPerDrill: 35 },
+  { id: "dep-9",  col: 7, row: 4, type: "xenocryst", totalAmount: 60,  remainingAmount: 60,  maxYieldPerDrill: 30 },
 
   // ── East Sector ──
-  { id: "dep-10", col: 7, row: 3, type: "hematite",  totalAmount: 75,  remainingAmount: 75,  maxYieldPerDrill: 35 },
-  { id: "dep-11", col: 8, row: 4, type: "titanium",  totalAmount: 80,  remainingAmount: 80,  maxYieldPerDrill: 40 },
-  { id: "dep-12", col: 7, row: 6, type: "xenocryst", totalAmount: 60,  remainingAmount: 60,  maxYieldPerDrill: 30 },
+  { id: "dep-10", col: 10, row: 6, type: "hematite",  totalAmount: 75,  remainingAmount: 75,  maxYieldPerDrill: 35 },
+  { id: "dep-11", col: 11, row: 7, type: "titanium",  totalAmount: 80,  remainingAmount: 80,  maxYieldPerDrill: 40 },
+  { id: "dep-12", col: 10, row: 9, type: "xenocryst", totalAmount: 60,  remainingAmount: 60,  maxYieldPerDrill: 30 },
 
   // ── South Sector ──
-  { id: "dep-13", col: 4, row: 7, type: "lithium",   totalAmount: 80,  remainingAmount: 80,  maxYieldPerDrill: 40 },
-  { id: "dep-14", col: 2, row: 7, type: "hematite",  totalAmount: 70,  remainingAmount: 70,  maxYieldPerDrill: 35 },
-  { id: "dep-15", col: 6, row: 7, type: "titanium",  totalAmount: 70,  remainingAmount: 70,  maxYieldPerDrill: 35 },
+  { id: "dep-13", col: 7, row: 10, type: "lithium",   totalAmount: 80,  remainingAmount: 80,  maxYieldPerDrill: 40 },
+  { id: "dep-14", col: 5, row: 10, type: "hematite",  totalAmount: 70,  remainingAmount: 70,  maxYieldPerDrill: 35 },
+  { id: "dep-15", col: 9, row: 10, type: "titanium",  totalAmount: 70,  remainingAmount: 70,  maxYieldPerDrill: 35 },
 
   // ── West Sector ──
-  { id: "dep-16", col: 1, row: 3, type: "xenocryst", totalAmount: 65,  remainingAmount: 65,  maxYieldPerDrill: 30 },
-  { id: "dep-17", col: 0, row: 4, type: "hematite",  totalAmount: 85,  remainingAmount: 85,  maxYieldPerDrill: 40 },
-  { id: "dep-18", col: 1, row: 5, type: "lithium",   totalAmount: 70,  remainingAmount: 70,  maxYieldPerDrill: 35 },
+  { id: "dep-16", col: 4, row: 6, type: "xenocryst", totalAmount: 65,  remainingAmount: 65,  maxYieldPerDrill: 30 },
+  { id: "dep-17", col: 3, row: 7, type: "hematite",  totalAmount: 85,  remainingAmount: 85,  maxYieldPerDrill: 40 },
+  { id: "dep-18", col: 4, row: 8, type: "lithium",   totalAmount: 70,  remainingAmount: 70,  maxYieldPerDrill: 35 },
 
   // ── Corner Outposts ──
-  { id: "dep-19", col: 1, row: 1, type: "titanium",  totalAmount: 90,  remainingAmount: 90,  maxYieldPerDrill: 45 },
-  { id: "dep-20", col: 7, row: 1, type: "xenocryst", totalAmount: 80,  remainingAmount: 80,  maxYieldPerDrill: 40 },
-  { id: "dep-21", col: 1, row: 7, type: "lithium",   totalAmount: 90,  remainingAmount: 90,  maxYieldPerDrill: 45 },
-  { id: "dep-22", col: 7, row: 7, type: "xenocryst", totalAmount: 95,  remainingAmount: 95,  maxYieldPerDrill: 45 },
+  { id: "dep-19", col: 4, row: 4, type: "titanium",  totalAmount: 90,  remainingAmount: 90,  maxYieldPerDrill: 45 },
+  { id: "dep-20", col: 10, row: 4, type: "xenocryst", totalAmount: 80,  remainingAmount: 80,  maxYieldPerDrill: 40 },
+  { id: "dep-21", col: 4, row: 10, type: "lithium",   totalAmount: 90,  remainingAmount: 90,  maxYieldPerDrill: 45 },
+  { id: "dep-22", col: 10, row: 10, type: "xenocryst", totalAmount: 95,  remainingAmount: 95,  maxYieldPerDrill: 45 },
 ];
 
-export function createInitialDepositsMap(): Record<string, MineralDeposit> {
+export function createInitialDepositsMap(
+  customDeposits?: (Omit<MineralDeposit, "depleted"> & { remainingAmount: number })[]
+): Record<string, MineralDeposit> {
+  const source = customDeposits ?? INITIAL_DEPOSIT_CONFIGS;
   const map: Record<string, MineralDeposit> = {};
-  for (const dep of INITIAL_DEPOSIT_CONFIGS) {
+  for (const dep of source) {
     map[getDepositKey(dep.col, dep.row)] = {
       ...dep,
       remainingAmount: dep.totalAmount,

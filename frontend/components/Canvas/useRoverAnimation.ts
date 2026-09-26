@@ -8,6 +8,8 @@ import {
   createInitialDepositsMap,
   getDepositKey,
 } from "./minerals";
+import type { RadiationZone } from "../rounds/roundsConfig";
+import { GRID_SIZE, MAP_MASK } from "./mapConfig";
 
 // ── Types ──────────────────────────────────────────────────────────────────
 
@@ -78,9 +80,9 @@ const BATTERY_COSTS: Record<string, number> = {
   LOG: 0,
 };
 
-const INITIAL_STATE: RoverState = {
-  col: 4,
-  row: 4,
+const BASE_STATE: Omit<RoverState, "deposits"> = {
+  col: 7,
+  row: 7,
   facing: "FRONT",
   battery: 100,
   minerals: 0,
@@ -97,9 +99,17 @@ const INITIAL_STATE: RoverState = {
     regolith: 0,
   },
   lastDrillResult: null,
-  deposits: createInitialDepositsMap(),
   drilledHoles: [],
 };
+
+function makeInitialState(
+  customDeposits?: Parameters<typeof createInitialDepositsMap>[0]
+): RoverState {
+  return {
+    ...BASE_STATE,
+    deposits: createInitialDepositsMap(customDeposits),
+  };
+}
 
 const DIRECTION_DELTA: Record<string, { dc: number; dr: number }> = {
   FRONT: { dc: 0,  dr: -1 },
@@ -115,7 +125,7 @@ const TURN_MAP: Record<RoverFacing, { LEFT: RoverFacing; RIGHT: RoverFacing }> =
   LEFT:  { LEFT: "BACK",  RIGHT: "FRONT" },
 };
 
-const GRID_SIZE = 9;
+
 
 function clamp(v: number, min: number, max: number) {
   return Math.max(min, Math.min(max, v));
@@ -123,10 +133,19 @@ function clamp(v: number, min: number, max: number) {
 
 // ── Hook ───────────────────────────────────────────────────────────────────
 
-export function useRoverAnimation(actions: RoverAction[]) {
+export function useRoverAnimation(
+  actions: RoverAction[],
+  radiationZones: RadiationZone[] = [],
+  initialBattery = 100,
+  initialInventory?: RoverInventory,
+  customDeposits?: Parameters<typeof createInitialDepositsMap>[0]
+) {
   const [state, setState] = useState<RoverState>(() => ({
-    ...INITIAL_STATE,
-    deposits: createInitialDepositsMap(),
+    ...makeInitialState(customDeposits),
+    battery: initialBattery,
+    inventory: initialInventory ?? {
+      lithium: 0, xenocryst: 0, titanium: 0, hematite: 0, regolith: 0,
+    },
   }));
   const [isPlaying, setIsPlaying] = useState(false);
   const [isFinished, setIsFinished] = useState(false);
@@ -153,16 +172,31 @@ export function useRoverAnimation(actions: RoverAction[]) {
   // Apply a single action to state
   const applyAction = useCallback((action: RoverAction, prev: RoverState): RoverState => {
     const cost = BATTERY_COSTS[action.action] ?? 0;
-    const newBattery = clamp(prev.battery - cost, 0, 100);
 
     switch (action.action) {
       case "DRIVE": {
         const dir = action.direction ?? prev.facing;
         const delta = DIRECTION_DELTA[dir];
+        let nextCol = prev.col + delta.dc;
+        let nextRow = prev.row + delta.dr;
+        
+        if (
+          nextCol < 0 || nextCol >= GRID_SIZE ||
+          nextRow < 0 || nextRow >= GRID_SIZE ||
+          MAP_MASK[nextRow]?.[nextCol] === 0
+        ) {
+          // Block movement into void or out of bounds
+          nextCol = prev.col;
+          nextRow = prev.row;
+        }
+        // Radiation zone: extra +5 battery drain on entry
+        const onRadiation = radiationZones.some((z) => z.col === nextCol && z.row === nextRow);
+        const extraCost = onRadiation ? 5 : 0;
+        const newBattery = clamp(prev.battery - cost - extraCost, 0, 100);
         return {
           ...prev,
-          col: clamp(prev.col + delta.dc, 0, GRID_SIZE - 1),
-          row: clamp(prev.row + delta.dr, 0, GRID_SIZE - 1),
+          col: nextCol,
+          row: nextRow,
           facing: dir,
           battery: newBattery,
           isMoving: true,
@@ -171,6 +205,26 @@ export function useRoverAnimation(actions: RoverAction[]) {
       }
 
       case "DRILL": {
+        const onRadiation = radiationZones.some((z) => z.col === prev.col && z.row === prev.row);
+        if (onRadiation) {
+          const drillResult: DrillResult = {
+            success: false,
+            type: "regolith",
+            amount: 0,
+            remaining: 0,
+            tileCol: prev.col,
+            tileRow: prev.row,
+            message: "☢️ Drill blocked: Radiation field detected — relocate before drilling",
+            timestamp: Date.now(),
+          };
+          return {
+            ...prev,
+            battery: Math.max(0, prev.battery - 2),
+            isDrilling: true,
+            lastDrillResult: drillResult,
+          };
+        }
+
         // Battery check
         if (prev.battery < 15) {
           const drillResult: DrillResult = {
@@ -260,7 +314,7 @@ export function useRoverAnimation(actions: RoverAction[]) {
 
         return {
           ...prev,
-          battery: newBattery,
+          battery: clamp(prev.battery - BATTERY_COSTS["DRILL"], 0, 100),
           minerals: currentTotal + actualYield,
           inventory: nextInventory,
           isDrilling: true,
@@ -274,7 +328,7 @@ export function useRoverAnimation(actions: RoverAction[]) {
         return {
           ...prev,
           scans: prev.scans + 1,
-          battery: newBattery,
+          battery: clamp(prev.battery - BATTERY_COSTS["SCAN"], 0, 100),
           isDrilling: false,
         };
 
@@ -290,15 +344,15 @@ export function useRoverAnimation(actions: RoverAction[]) {
         return {
           ...prev,
           facing: TURN_MAP[prev.facing][dir],
-          battery: newBattery,
+          battery: clamp(prev.battery - BATTERY_COSTS["TURN"], 0, 100),
           isDrilling: false,
         };
       }
 
       default:
-        return { ...prev, battery: newBattery, isDrilling: false };
+        return { ...prev, battery: clamp(prev.battery - (BATTERY_COSTS[action.action] ?? 0), 0, 100), isDrilling: false };
     }
-  }, []);
+  }, [radiationZones]);
 
   // Animation loop using requestAnimationFrame
   const tick = useCallback((timestamp: number) => {
@@ -367,12 +421,15 @@ export function useRoverAnimation(actions: RoverAction[]) {
     setProgress(0);
     setCurrentAction(null);
     const fresh: RoverState = {
-      ...INITIAL_STATE,
-      deposits: createInitialDepositsMap(),
+      ...makeInitialState(customDeposits),
+      battery: initialBattery,
+      inventory: initialInventory ?? {
+        lithium: 0, xenocryst: 0, titanium: 0, hematite: 0, regolith: 0,
+      },
     };
     setState(fresh);
     stateRef.current = fresh;
-  }, [pause]);
+  }, [pause, customDeposits, initialBattery, initialInventory]);
 
   // Auto-play when new actions arrive
   useEffect(() => {

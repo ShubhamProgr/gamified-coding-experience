@@ -29,8 +29,13 @@ private:
 public:
     void drive(std::string direction) {
         std::transform(direction.begin(), direction.end(), direction.begin(), ::toupper);
-        if (direction != "NORTH" && direction != "SOUTH" && direction != "EAST" && direction != "WEST") {
-            throw std::invalid_argument("Invalid direction '" + direction + "'. Must be one of: EAST, NORTH, SOUTH, WEST");
+        if (direction == "NORTH") direction = "FRONT";
+        else if (direction == "SOUTH") direction = "BACK";
+        else if (direction == "EAST") direction = "RIGHT";
+        else if (direction == "WEST") direction = "LEFT";
+
+        if (direction != "FRONT" && direction != "BACK" && direction != "RIGHT" && direction != "LEFT") {
+            throw std::invalid_argument("Invalid direction '" + direction + "'. Must be one of: FRONT, BACK, RIGHT, LEFT (or NORTH, SOUTH, EAST, WEST)");
         }
         _emit("DRIVE", {{"direction", direction}});
     }

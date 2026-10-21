@@ -120,19 +120,19 @@ export const INITIAL_DEPOSIT_CONFIGS: (Omit<MineralDeposit, "depleted"> & { rema
   { id: "dep-9",  col: 7, row: 4, type: "xenocryst", totalAmount: 60,  remainingAmount: 60,  maxYieldPerDrill: 30 },
 
   // ── East Sector ──
-  { id: "dep-10", col: 10, row: 6, type: "hematite",  totalAmount: 75,  remainingAmount: 75,  maxYieldPerDrill: 35 },
+  { id: "dep-10", col: 9, row: 6, type: "hematite",  totalAmount: 75,  remainingAmount: 75,  maxYieldPerDrill: 35 },
   { id: "dep-11", col: 11, row: 7, type: "titanium",  totalAmount: 80,  remainingAmount: 80,  maxYieldPerDrill: 40 },
   { id: "dep-12", col: 10, row: 9, type: "xenocryst", totalAmount: 60,  remainingAmount: 60,  maxYieldPerDrill: 30 },
 
   // ── South Sector ──
   { id: "dep-13", col: 7, row: 10, type: "lithium",   totalAmount: 80,  remainingAmount: 80,  maxYieldPerDrill: 40 },
-  { id: "dep-14", col: 5, row: 10, type: "hematite",  totalAmount: 70,  remainingAmount: 70,  maxYieldPerDrill: 35 },
+  { id: "dep-14", col: 4, row: 10, type: "hematite",  totalAmount: 70,  remainingAmount: 70,  maxYieldPerDrill: 35 },
   { id: "dep-15", col: 9, row: 10, type: "titanium",  totalAmount: 70,  remainingAmount: 70,  maxYieldPerDrill: 35 },
 
   // ── West Sector ──
-  { id: "dep-16", col: 4, row: 6, type: "xenocryst", totalAmount: 65,  remainingAmount: 65,  maxYieldPerDrill: 30 },
+  { id: "dep-16", col: 5, row: 6, type: "xenocryst", totalAmount: 65,  remainingAmount: 65,  maxYieldPerDrill: 30 },
   { id: "dep-17", col: 3, row: 7, type: "hematite",  totalAmount: 85,  remainingAmount: 85,  maxYieldPerDrill: 40 },
-  { id: "dep-18", col: 4, row: 8, type: "lithium",   totalAmount: 70,  remainingAmount: 70,  maxYieldPerDrill: 35 },
+  { id: "dep-18", col: 5, row: 8, type: "lithium",   totalAmount: 70,  remainingAmount: 70,  maxYieldPerDrill: 35 },
 
   // ── Corner Outposts ──
   { id: "dep-19", col: 4, row: 4, type: "titanium",  totalAmount: 90,  remainingAmount: 90,  maxYieldPerDrill: 45 },

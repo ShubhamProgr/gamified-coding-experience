@@ -175,8 +175,14 @@ export function useRoverAnimation(
 
     switch (action.action) {
       case "DRIVE": {
-        const dir = action.direction ?? prev.facing;
-        const delta = DIRECTION_DELTA[dir];
+        const rawDir = (action.direction ?? prev.facing).toUpperCase();
+        const dir: RoverFacing =
+          rawDir === "NORTH" ? "FRONT" :
+          rawDir === "SOUTH" ? "BACK" :
+          rawDir === "EAST"  ? "RIGHT" :
+          rawDir === "WEST"  ? "LEFT" :
+          (rawDir as RoverFacing);
+        const delta = DIRECTION_DELTA[dir] ?? { dc: 0, dr: 0 };
         let nextCol = prev.col + delta.dc;
         let nextRow = prev.row + delta.dr;
         

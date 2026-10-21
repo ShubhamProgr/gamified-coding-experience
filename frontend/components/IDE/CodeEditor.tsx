@@ -12,26 +12,40 @@ interface CodeEditorProps {
 }
 
 export const DEFAULT_CODES: Record<string, string> = {
-  python: `# Sector 9x9 Survey Mission (type /help in Terminal for SDK reference)
-for i in range(3):
-    rover.drive("FRONT")
-    rover.drill()
+  python: `# Sector Geological Survey — Multi-Direction Navigation
+# Observe how the rover rotates & adapts to each direction:
+rover.drive("RIGHT")
+rover.drill()
+rover.drive("BACK")
+rover.drill()
+rover.drive("LEFT")
+rover.drill()
+rover.drive("FRONT")
+rover.drill()
 `,
   java: `public class Main {
     public static void main(String[] args) {
         Rover rover = new Rover();
-        for (int i = 0; i < 3; i++) {
-            rover.drive("FRONT");
-            rover.drill();
-        }
+        rover.drive("RIGHT");
+        rover.drill();
+        rover.drive("BACK");
+        rover.drill();
+        rover.drive("LEFT");
+        rover.drill();
+        rover.drive("FRONT");
+        rover.drill();
     }
 }
 `,
   cpp: `int main() {
-    for (int i = 0; i < 3; i++) {
-        rover.drive("FRONT");
-        rover.drill();
-    }
+    rover.drive("RIGHT");
+    rover.drill();
+    rover.drive("BACK");
+    rover.drill();
+    rover.drive("LEFT");
+    rover.drill();
+    rover.drive("FRONT");
+    rover.drill();
     return 0;
 }
 `

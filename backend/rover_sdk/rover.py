@@ -32,14 +32,16 @@ class Rover:
     """
 
     VALID_DIRECTIONS = {"FRONT", "BACK", "RIGHT", "LEFT"}
+    DIR_ALIAS = {"NORTH": "FRONT", "SOUTH": "BACK", "EAST": "RIGHT", "WEST": "LEFT"}
 
     def drive(self, direction: str) -> None:
-        """Move the rover one tile in the given cardinal direction."""
+        """Move the rover one tile in the given direction (FRONT, BACK, RIGHT, LEFT)."""
         direction = direction.upper()
+        direction = self.DIR_ALIAS.get(direction, direction)
         if direction not in self.VALID_DIRECTIONS:
             raise ValueError(
                 f"Invalid direction '{direction}'. "
-                f"Must be one of: {', '.join(sorted(self.VALID_DIRECTIONS))}"
+                f"Must be one of: {', '.join(sorted(self.VALID_DIRECTIONS))} (or NORTH, SOUTH, EAST, WEST)"
             )
         _emit({"action": "DRIVE", "direction": direction})
 

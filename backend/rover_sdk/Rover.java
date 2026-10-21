@@ -25,9 +25,14 @@ public class Rover {
 
     public void drive(String direction) {
         direction = direction.toUpperCase();
-        if (!direction.equals("NORTH") && !direction.equals("SOUTH") && 
-            !direction.equals("EAST") && !direction.equals("WEST")) {
-            throw new IllegalArgumentException("Invalid direction '" + direction + "'. Must be one of: EAST, NORTH, SOUTH, WEST");
+        if (direction.equals("NORTH")) direction = "FRONT";
+        else if (direction.equals("SOUTH")) direction = "BACK";
+        else if (direction.equals("EAST")) direction = "RIGHT";
+        else if (direction.equals("WEST")) direction = "LEFT";
+
+        if (!direction.equals("FRONT") && !direction.equals("BACK") && 
+            !direction.equals("RIGHT") && !direction.equals("LEFT")) {
+            throw new IllegalArgumentException("Invalid direction '" + direction + "'. Must be one of: FRONT, BACK, RIGHT, LEFT (or NORTH, SOUTH, EAST, WEST)");
         }
         Map<String, Object> fields = new HashMap<>();
         fields.put("direction", direction);

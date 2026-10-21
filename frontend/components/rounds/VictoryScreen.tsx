@@ -3,10 +3,10 @@
 import { useEffect, useState } from "react";
 import type { RoverInventory } from "../Canvas/useRoverAnimation";
 import { MINERAL_METAS } from "../Canvas/minerals";
-import { ROUNDS } from "./roundsConfig";
+import { MAX_ROUNDS, ROUNDS } from "./roundsConfig";
 
 interface VictoryScreenProps {
-  starsEarned: [number, number, number];
+  starsEarned: number[];
   cumulativeMinerals: number;
   inventory: RoverInventory;
   battery: number;
@@ -50,7 +50,7 @@ function RoundSummaryRow({
   stars,
   target,
 }: {
-  roundNum: 1 | 2 | 3;
+  roundNum: number;
   stars: number;
   target: number;
 }) {
@@ -99,18 +99,19 @@ export default function VictoryScreen({
   }, []);
 
   const totalStars = starsEarned.reduce((a, b) => a + b, 0);
-  const maxStars = 9;
+  const maxStars = MAX_ROUNDS * 3;
+  const ratio = totalStars / maxStars;
   const rating =
-    totalStars >= 9 ? "Elite Commander" :
-    totalStars >= 7 ? "Expert Pilot" :
-    totalStars >= 5 ? "Field Operative" :
-    totalStars >= 3 ? "Rookie Recruit" : "Cadet";
+    ratio >= 0.9 ? "Elite Commander" :
+    ratio >= 0.75 ? "Expert Pilot" :
+    ratio >= 0.55 ? "Field Operative" :
+    ratio >= 0.3 ? "Rookie Recruit" : "Cadet";
 
   const ratingColor =
-    totalStars >= 9 ? "#ffb700" :
-    totalStars >= 7 ? "#d946ef" :
-    totalStars >= 5 ? "#00d4ff" :
-    totalStars >= 3 ? "#00ff88" : "var(--text-muted)";
+    ratio >= 0.9 ? "#ffb700" :
+    ratio >= 0.75 ? "#d946ef" :
+    ratio >= 0.55 ? "#00d4ff" :
+    ratio >= 0.3 ? "#00ff88" : "var(--text-muted)";
 
 
   return (
@@ -174,7 +175,7 @@ export default function VictoryScreen({
             Mission Complete!
           </div>
           <div style={{ fontSize: 13, color: "var(--text-muted)", marginTop: 4 }}>
-            All three sectors surveyed and conquered
+            All {MAX_ROUNDS} sectors surveyed and conquered
           </div>
 
           {/* Total stars */}
@@ -187,7 +188,9 @@ export default function VictoryScreen({
               marginTop: 16,
             }}
           >
-            <div style={{ fontSize: 32 }}>{"⭐".repeat(totalStars)}</div>
+            <div style={{ fontSize: 32 }}>
+              {totalStars > 0 ? `⭐ ×${totalStars}` : "—"}
+            </div>
           </div>
           <div
             style={{
@@ -235,9 +238,14 @@ export default function VictoryScreen({
             Mission Summary
           </div>
           <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
-            <RoundSummaryRow roundNum={1} stars={starsEarned[0]} target={ROUNDS[0].mineralTarget} />
-            <RoundSummaryRow roundNum={2} stars={starsEarned[1]} target={ROUNDS[1].mineralTarget} />
-            <RoundSummaryRow roundNum={3} stars={starsEarned[2]} target={ROUNDS[2].mineralTarget} />
+            {ROUNDS.map((round, i) => (
+              <RoundSummaryRow
+                key={round.id}
+                roundNum={i + 1}
+                stars={starsEarned[i] ?? 0}
+                target={round.mineralTarget}
+              />
+            ))}
           </div>
         </div>
 

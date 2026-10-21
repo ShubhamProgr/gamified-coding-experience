@@ -12,7 +12,7 @@ import RoundBanner from "@/components/rounds/RoundBanner";
 import RoundCompleteModal from "@/components/rounds/RoundCompleteModal";
 import VictoryScreen from "@/components/rounds/VictoryScreen";
 import { useRoundManager } from "@/components/rounds/useRoundManager";
-import { ROUNDS } from "@/components/rounds/roundsConfig";
+import { MAX_ROUNDS, ROUNDS } from "@/components/rounds/roundsConfig";
 
 // Monaco must be loaded client-side only (no SSR)
 const CodeEditor = dynamic(() => import("@/components/IDE/CodeEditor"), {
@@ -454,7 +454,7 @@ export default function Home() {
       </div>
 
       {/* Round Complete Modal */}
-      {roundState.showCompleteModal && roundState.currentRound < 3 && (
+      {roundState.showCompleteModal && roundState.currentRound < MAX_ROUNDS && (
         <RoundCompleteModal
           roundConfig={currentRoundConfig}
           nextRoundConfig={ROUNDS[roundState.currentRound]} // currentRound is already advanced in state? No — advance happens on button click

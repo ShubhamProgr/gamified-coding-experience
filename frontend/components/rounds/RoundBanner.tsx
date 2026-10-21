@@ -1,43 +1,64 @@
 "use client";
 
-import type { RoundConfig } from "./roundsConfig";
+import { MAX_ROUNDS, type RoundConfig } from "./roundsConfig";
 
 interface RoundBannerProps {
   roundConfig: RoundConfig;
   cumulativeMinerals: number;
   currentRoundMinerals: number;
-  starsEarned: [number, number, number];
+  starsEarned: number[];
   battery: number;
 }
 
-function StarRow({ starsEarned }: { starsEarned: [number, number, number] }) {
+function StarRow({
+  starsEarned,
+  currentRound,
+}: {
+  starsEarned: number[];
+  currentRound: number;
+}) {
+  const totalStars = starsEarned.reduce((sum, stars) => sum + stars, 0);
+  const currentStars = starsEarned[currentRound - 1] ?? 0;
+
   return (
     <div style={{ display: "flex", alignItems: "center", gap: 4 }}>
-      {([1, 2, 3] as const).map((r) => (
-        <div
-          key={r}
-          style={{
-            display: "flex",
-            alignItems: "center",
-            gap: 2,
-            padding: "2px 7px",
-            borderRadius: 12,
-            background:
-              starsEarned[r - 1] > 0
-                ? "rgba(255,183,0,0.15)"
-                : "rgba(255,255,255,0.04)",
-            border: `1px solid ${starsEarned[r - 1] > 0 ? "rgba(255,183,0,0.4)" : "var(--space-border)"}`,
-            fontSize: 10,
-            fontFamily: "var(--font-code)",
-            fontWeight: 700,
-            color: starsEarned[r - 1] > 0 ? "#ffb700" : "var(--text-muted)",
-            transition: "all 0.3s ease",
-          }}
-        >
-          <span style={{ fontSize: 9 }}>R{r}</span>
-          <span>{starsEarned[r - 1] > 0 ? "⭐".repeat(starsEarned[r - 1]) : "—"}</span>
-        </div>
-      ))}
+      <div
+        style={{
+          display: "flex",
+          alignItems: "center",
+          gap: 2,
+          padding: "2px 7px",
+          borderRadius: 12,
+          background:
+            currentStars > 0
+              ? "rgba(255,183,0,0.15)"
+              : "rgba(255,255,255,0.04)",
+          border: `1px solid ${currentStars > 0 ? "rgba(255,183,0,0.4)" : "var(--space-border)"}`,
+          fontSize: 10,
+          fontFamily: "var(--font-code)",
+          fontWeight: 700,
+          color: currentStars > 0 ? "#ffb700" : "var(--text-muted)",
+          transition: "all 0.3s ease",
+        }}
+      >
+        <span style={{ fontSize: 9 }}>R{currentRound}</span>
+        <span>{currentStars > 0 ? "⭐".repeat(currentStars) : "—"}</span>
+      </div>
+      <div
+        style={{
+          padding: "2px 7px",
+          borderRadius: 12,
+          background: "rgba(255,183,0,0.08)",
+          border: "1px solid rgba(255,183,0,0.25)",
+          fontSize: 10,
+          fontFamily: "var(--font-code)",
+          fontWeight: 700,
+          color: "#ffb700",
+          whiteSpace: "nowrap",
+        }}
+      >
+        ⭐ {totalStars}/{MAX_ROUNDS * 3}
+      </div>
     </div>
   );
 }
@@ -236,7 +257,7 @@ export default function RoundBanner({
       )}
 
       {/* Star tracker */}
-      <StarRow starsEarned={starsEarned} />
+      <StarRow starsEarned={starsEarned} currentRound={roundConfig.id} />
 
       {/* Spacer */}
       <div style={{ flex: 1 }} />

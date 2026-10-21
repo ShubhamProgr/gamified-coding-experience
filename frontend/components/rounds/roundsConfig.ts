@@ -1,7 +1,11 @@
 "use client";
 
+import { INITIAL_DEPOSIT_CONFIGS, type MineralType } from "../Canvas/minerals";
+import { GRID_SIZE, MAP_MASK } from "../Canvas/mapConfig";
 
 // ── Round Configuration Types ─────────────────────────────────────────────
+
+export const MAX_ROUNDS = 25;
 
 export interface StarThreshold {
   minerals: number;  // cumulative mineral target
@@ -14,7 +18,7 @@ export interface RadiationZone {
 }
 
 export interface RoundConfig {
-  id: 1 | 2 | 3;
+  id: number;
   name: string;
   subtitle: string;
   description: string;
@@ -28,7 +32,7 @@ export interface RoundConfig {
 
 // ── Round Definitions ─────────────────────────────────────────────────────
 
-export const ROUNDS: RoundConfig[] = [
+const BASE_ROUNDS: RoundConfig[] = [
   {
     id: 1,
     name: "Round 1",
@@ -95,6 +99,123 @@ export const ROUNDS: RoundConfig[] = [
   },
 ];
 
+// ── Generated rounds (4 – 25) ─────────────────────────────────────────────
+
+interface Cell {
+  col: number;
+  row: number;
+}
+
+const START_CELL: Cell = { col: 7, row: 7 };
+
+const WALKABLE_CELLS: Cell[] = [];
+for (let row = 0; row < GRID_SIZE; row++) {
+  for (let col = 0; col < GRID_SIZE; col++) {
+    if (MAP_MASK[row]?.[col] === 1) WALKABLE_CELLS.push({ col, row });
+  }
+}
+
+const GENERATED_SUBTITLES = [
+  "Red Canyon", "Frozen Ridge", "Dust Basin", "Magnetic Field", "Crystal Vein",
+  "Ancient Crater", "Solar Flare", "Deep Trench", "Lost Outpost", "Ion Storm",
+  "Nebula Rift", "Ash Plains", "Silent Expanse", "Iron Labyrinth",
+  "Echo Caverns", "Fracture Zone", "Polar Drift", "Obsidian Maze",
+  "Final Frontier", "Core Requiem", "Event Horizon", "Last Stand",
+];
+
+const GENERATED_ICONS = [
+  "🛰", "⛏", "🌋", "❄", "🧭", "💠", "🌪", "🕳", "🏚", "⚡", "🌌",
+  "🌑", "🌵", "🧲", "🔮", "🧱", "🧊", "🪨", "🚀", "🔥", "🛸", "🏁",
+];
+
+const GENERATED_ACCENTS = [
+  "#22d3ee", "#a3e635", "#fb7185", "#f59e0b", "#8b5cf6", "#14b8a6",
+  "#f43f5e", "#84cc16", "#06b6d4", "#eab308", "#ec4899", "#10b981",
+];
+
+function makeRng(seed: number) {
+  let s = seed >>> 0;
+  return () => {
+    s = (s * 1664525 + 1013904223) >>> 0;
+    return s / 4294967296;
+  };
+}
+
+function shuffled<T>(items: T[], random: () => number): T[] {
+  const copy = [...items];
+  for (let i = copy.length - 1; i > 0; i--) {
+    const j = Math.floor(random() * (i + 1));
+    [copy[i], copy[j]] = [copy[j], copy[i]];
+  }
+  return copy;
+}
+
+function pickCells(seed: number, count: number, excluded: Set<string>): Cell[] {
+  const random = makeRng(seed);
+  const pool = WALKABLE_CELLS.filter((cell) => {
+    if (cell.col === START_CELL.col && cell.row === START_CELL.row) return false;
+    return !excluded.has(`${cell.col},${cell.row}`);
+  });
+  return shuffled(pool, random).slice(0, count);
+}
+
+function mineralTargetForRound(round: number): number {
+  if (round === 1) return 50;
+  if (round === 2) return 150;
+  if (round === 3) return 300;
+
+  let target = 300;
+  for (let n = 4; n <= round; n++) {
+    target += 110 + (n - 4) * 10;
+  }
+  return target;
+}
+
+function generateRadiationZones(round: number): RadiationZone[] {
+  const count = Math.min(3 + Math.floor((round - 4) / 2), 12);
+  return pickCells(9000 + round * 131, count, new Set()).map(({ col, row }) => ({
+    col,
+    row,
+  }));
+}
+
+function buildGeneratedRound(round: number): RoundConfig {
+  const target = mineralTargetForRound(round);
+  const radiationZones = generateRadiationZones(round);
+  const previousTarget = mineralTargetForRound(round - 1);
+  const delta = target - previousTarget;
+  const index = round - 4;
+
+  return {
+    id: round,
+    name: `Round ${round}`,
+    subtitle: GENERATED_SUBTITLES[index % GENERATED_SUBTITLES.length],
+    description:
+      `Sector ${round} is ready for survey. Collect ${target}u cumulative to secure the next relay.` +
+      (radiationZones.length > 0
+        ? ` Avoid ${radiationZones.length} radiation pockets — they disable your drill and drain extra battery.`
+        : "") +
+      ` Expect roughly ${delta}u of new reserves in this sector.`,
+    mineralTarget: target,
+    starThresholds: [
+      { minerals: target, battery: 0 },
+      { minerals: target, battery: Math.max(20, 45 - round) },
+      { minerals: target + 100 + round * 5, battery: Math.max(10, 30 - round) },
+    ],
+    radiationZones,
+    depositSeed: 1000 + round * 37,
+    accentColor: GENERATED_ACCENTS[index % GENERATED_ACCENTS.length],
+    icon: GENERATED_ICONS[index % GENERATED_ICONS.length],
+  };
+}
+
+export const ROUNDS: RoundConfig[] = [
+  ...BASE_ROUNDS,
+  ...Array.from({ length: MAX_ROUNDS - BASE_ROUNDS.length }, (_, i) =>
+    buildGeneratedRound(i + BASE_ROUNDS.length + 1)
+  ),
+];
+
 // ── Helper: get deposit key ───────────────────────────────────────────────
 
 export function isRadiationZone(
@@ -122,10 +243,8 @@ export function computeStars(
 }
 
 // ── Per-round deposit configs (alternate layouts) ─────────────────────────
-// Round 2 & 3 use a different deposit spread so the map feels fresh.
+// Every round has its own deposit spread so the map feels fresh.
 // Radiation zone coords are intentionally NOT overlapping with deposits.
-
-import type { MineralType } from "../Canvas/minerals";
 
 export interface RoundDepositConfig {
   id: string;
@@ -192,3 +311,46 @@ export const ROUND3_DEPOSITS: RoundDepositConfig[] = [
   { id: "r3-19", col: 3, row: 12, type: "titanium",  totalAmount: 115, remainingAmount: 115, maxYieldPerDrill: 55 },
 ];
 
+const DEPOSIT_TYPES: MineralType[] = ["lithium", "titanium", "hematite", "xenocryst"];
+
+function buildGeneratedDeposits(round: number): RoundDepositConfig[] {
+  const config = ROUNDS[round - 1];
+  const previousTarget = ROUNDS[round - 2]?.mineralTarget ?? 0;
+  const delta = config.mineralTarget - previousTarget;
+  const count = 14 + ((round * 3) % 5);
+  const needed = Math.max(200, delta * 2.5);
+  const totalAmount = Math.max(60, Math.ceil(needed / count / 5) * 5);
+  const maxYieldPerDrill = Math.max(20, Math.ceil(totalAmount / 2 / 5) * 5);
+
+  const excluded = new Set(
+    config.radiationZones.map((zone) => `${zone.col},${zone.row}`)
+  );
+  const cells = pickCells(config.depositSeed, count, excluded);
+
+  return cells.map(({ col, row }, i) => ({
+    id: `r${round}-${i + 1}`,
+    col,
+    row,
+    type: DEPOSIT_TYPES[i % DEPOSIT_TYPES.length],
+    totalAmount,
+    remainingAmount: totalAmount,
+    maxYieldPerDrill,
+  }));
+}
+
+const GENERATED_DEPOSITS: Record<number, RoundDepositConfig[]> = {};
+for (let round = 4; round <= MAX_ROUNDS; round++) {
+  GENERATED_DEPOSITS[round] = buildGeneratedDeposits(round);
+}
+
+export function getDepositsForRound(round: number): RoundDepositConfig[] {
+  if (round === 1) {
+    return INITIAL_DEPOSIT_CONFIGS.map((deposit) => ({
+      ...deposit,
+      remainingAmount: deposit.totalAmount,
+    }));
+  }
+  if (round === 2) return ROUND2_DEPOSITS;
+  if (round === 3) return ROUND3_DEPOSITS;
+  return GENERATED_DEPOSITS[round] ?? [];
+}

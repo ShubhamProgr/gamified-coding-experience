@@ -3,13 +3,12 @@
 import { useState, useCallback } from "react";
 import {
   ROUNDS,
+  MAX_ROUNDS,
   RoundConfig,
   computeStars,
-  ROUND2_DEPOSITS,
-  ROUND3_DEPOSITS,
+  getDepositsForRound,
   RoundDepositConfig,
 } from "./roundsConfig";
-import { INITIAL_DEPOSIT_CONFIGS } from "../Canvas/minerals";
 import type { RoverInventory } from "../Canvas/useRoverAnimation";
 
 // ── Types ─────────────────────────────────────────────────────────────────
@@ -17,9 +16,9 @@ import type { RoverInventory } from "../Canvas/useRoverAnimation";
 export type RoundStatus = "playing" | "complete" | "victory";
 
 export interface RoundManagerState {
-  currentRound: 1 | 2 | 3;
+  currentRound: number;
   roundStatus: RoundStatus;
-  starsEarned: [number, number, number]; // per round 1,2,3
+  starsEarned: number[]; // per round 1..MAX_ROUNDS
   cumulativeMinerals: number;
   persistentBattery: number;
   persistentInventory: RoverInventory;
@@ -30,19 +29,11 @@ export interface RoundManagerState {
 export interface RoundManagerAPI {
   state: RoundManagerState;
   currentRoundConfig: RoundConfig;
-  getDepositsForRound: (round: 1 | 2 | 3) => RoundDepositConfig[];
+  getDepositsForRound: (round: number) => RoundDepositConfig[];
   handleRoundFinished: (minerals: number, battery: number, inventory: RoverInventory) => void;
   advanceRound: () => void;
   dismissModal: () => void;
   resetAll: () => void;
-}
-
-// ── Deposit helpers ───────────────────────────────────────────────────────
-
-function toRoundDepositConfig(
-  src: typeof INITIAL_DEPOSIT_CONFIGS
-): RoundDepositConfig[] {
-  return src.map((d) => ({ ...d, remainingAmount: d.totalAmount }));
 }
 
 // ── Hook ──────────────────────────────────────────────────────────────────
@@ -58,7 +49,7 @@ const EMPTY_INVENTORY: RoverInventory = {
 const INITIAL_STATE: RoundManagerState = {
   currentRound: 1,
   roundStatus: "playing",
-  starsEarned: [0, 0, 0],
+  starsEarned: Array.from({ length: MAX_ROUNDS }, () => 0),
   cumulativeMinerals: 0,
   persistentBattery: 100,
   persistentInventory: { ...EMPTY_INVENTORY },
@@ -71,12 +62,8 @@ export function useRoundManager(): RoundManagerAPI {
 
   const currentRoundConfig = ROUNDS[state.currentRound - 1];
 
-  const getDepositsForRound = useCallback(
-    (round: 1 | 2 | 3): RoundDepositConfig[] => {
-      if (round === 1) return toRoundDepositConfig(INITIAL_DEPOSIT_CONFIGS);
-      if (round === 2) return ROUND2_DEPOSITS;
-      return ROUND3_DEPOSITS;
-    },
+  const getDeposits = useCallback(
+    (round: number): RoundDepositConfig[] => getDepositsForRound(round),
     []
   );
 
@@ -89,10 +76,10 @@ export function useRoundManager(): RoundManagerAPI {
         const cumulative = prev.cumulativeMinerals + minerals;
         const stars = computeStars(currentRoundConfig, cumulative, battery);
         const idx = prev.currentRound - 1;
-        const newStars = [...prev.starsEarned] as [number, number, number];
+        const newStars = [...prev.starsEarned];
         newStars[idx] = stars;
 
-        const isLastRound = prev.currentRound === 3;
+        const isLastRound = prev.currentRound >= MAX_ROUNDS;
 
         return {
           ...prev,
@@ -112,10 +99,10 @@ export function useRoundManager(): RoundManagerAPI {
   /** Advance to the next round (called from the RoundCompleteModal). */
   const advanceRound = useCallback(() => {
     setState((prev) => {
-      if (prev.currentRound >= 3) return prev;
+      if (prev.currentRound >= MAX_ROUNDS) return prev;
       return {
         ...prev,
-        currentRound: (prev.currentRound + 1) as 1 | 2 | 3,
+        currentRound: prev.currentRound + 1,
         roundStatus: "playing",
         showCompleteModal: false,
         showVictoryScreen: false,
@@ -134,13 +121,17 @@ export function useRoundManager(): RoundManagerAPI {
 
   /** Full reset back to Round 1. */
   const resetAll = useCallback(() => {
-    setState({ ...INITIAL_STATE, persistentInventory: { ...EMPTY_INVENTORY } });
+    setState({
+      ...INITIAL_STATE,
+      starsEarned: Array.from({ length: MAX_ROUNDS }, () => 0),
+      persistentInventory: { ...EMPTY_INVENTORY },
+    });
   }, []);
 
   return {
     state,
     currentRoundConfig,
-    getDepositsForRound,
+    getDepositsForRound: getDeposits,
     handleRoundFinished,
     advanceRound,
     dismissModal,

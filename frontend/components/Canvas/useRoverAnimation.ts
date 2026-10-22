@@ -36,11 +36,9 @@ export interface DrillResult {
 }
 
 export interface RoverInventory {
-  lithium: number;
-  xenocryst: number;
-  titanium: number;
-  hematite: number;
-  regolith: number;
+  cuprion: number;
+  pythorium: number;
+  javium: number;
 }
 
 export interface RoverState {
@@ -92,11 +90,9 @@ const BASE_STATE: Omit<RoverState, "deposits"> = {
   isDrilling: false,
   cargoCapacity: 250,
   inventory: {
-    lithium: 0,
-    xenocryst: 0,
-    titanium: 0,
-    hematite: 0,
-    regolith: 0,
+    cuprion: 0,
+    pythorium: 0,
+    javium: 0,
   },
   lastDrillResult: null,
   drilledHoles: [],
@@ -144,7 +140,7 @@ export function useRoverAnimation(
     ...makeInitialState(customDeposits),
     battery: initialBattery,
     inventory: initialInventory ?? {
-      lithium: 0, xenocryst: 0, titanium: 0, hematite: 0, regolith: 0,
+      cuprion: 0, pythorium: 0, javium: 0,
     },
   }));
   const [isPlaying, setIsPlaying] = useState(false);
@@ -215,7 +211,7 @@ export function useRoverAnimation(
         if (onRadiation) {
           const drillResult: DrillResult = {
             success: false,
-            type: "regolith",
+            type: "cuprion",
             amount: 0,
             remaining: 0,
             tileCol: prev.col,
@@ -235,7 +231,7 @@ export function useRoverAnimation(
         if (prev.battery < 15) {
           const drillResult: DrillResult = {
             success: false,
-            type: "regolith",
+            type: "cuprion",
             amount: 0,
             remaining: 0,
             tileCol: prev.col,
@@ -254,7 +250,7 @@ export function useRoverAnimation(
         const depKey = getDepositKey(prev.col, prev.row);
         const deposit = prev.deposits[depKey];
 
-        let drillType: MineralType = "regolith";
+        let drillType: MineralType = "cuprion";
         let extractedAmount = 0;
         let remainingInDeposit = 0;
         let msg = "";
@@ -274,13 +270,13 @@ export function useRoverAnimation(
             ? `Excavated deposit! +${extractedAmount} ${meta.shortName} (Vein depleted)`
             : `Core drill extracted +${extractedAmount} ${meta.shortName}! (${remainingInDeposit} remaining)`;
         } else if (deposit && deposit.depleted) {
-          drillType = "regolith";
-          extractedAmount = 2;
-          msg = `Mineral vein depleted. Extracted trace regolith (+2)`;
+          drillType = "cuprion";
+          extractedAmount = 0;
+          msg = `Mineral vein depleted. No recoverable metal remains.`;
         } else {
-          drillType = "regolith";
-          extractedAmount = 4;
-          msg = `Surface borehole drilled. Extracted Martian regolith (+4)`;
+          drillType = "cuprion";
+          extractedAmount = 0;
+          msg = `Surface borehole drilled. No mineral deposit detected.`;
         }
 
         // Apply cargo capacity limit
@@ -430,7 +426,7 @@ export function useRoverAnimation(
       ...makeInitialState(customDeposits),
       battery: initialBattery,
       inventory: initialInventory ?? {
-        lithium: 0, xenocryst: 0, titanium: 0, hematite: 0, regolith: 0,
+        cuprion: 0, pythorium: 0, javium: 0,
       },
     };
     setState(fresh);

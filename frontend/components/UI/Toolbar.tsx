@@ -240,9 +240,11 @@ export default function Toolbar({
           border: "1px solid rgba(0,212,255,0.2)",
         }}
       >
-        <span style={{ fontSize: 12 }}>
-          {language === "python" ? "🐍" : language === "cpp" ? "⚙️" : "☕"}
-        </span>
+        {language !== "python" && (
+          <span style={{ fontSize: 12 }}>
+            {language === "cpp" ? "⚙️" : "☕"}
+          </span>
+        )}
         <select
           value={language}
           onChange={(e) => onLanguageChange?.(e.target.value)}

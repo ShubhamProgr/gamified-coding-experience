@@ -92,7 +92,7 @@ export default function HUD({ roverState, totalActions, isFinished }: HUDProps) 
   // Current tile deposit check
   const currentDeposit = roverState.deposits[getDepositKey(col, row)];
 
-  const mineralTypes: MineralType[] = ["lithium", "xenocryst", "titanium", "hematite"];
+  const mineralTypes: MineralType[] = ["cuprion", "pythorium", "javium"];
 
   return (
     <div
@@ -219,25 +219,6 @@ export default function HUD({ roverState, totalActions, isFinished }: HUDProps) 
           })}
         </div>
 
-        {inventory.regolith > 0 && (
-          <div
-            style={{
-              display: "flex",
-              alignItems: "center",
-              justifyContent: "space-between",
-              padding: "3px 6px",
-              borderRadius: "var(--radius-sm)",
-              background: "rgba(196,149,106,0.08)",
-              border: "1px solid rgba(196,149,106,0.25)",
-              marginTop: 2,
-            }}
-          >
-            <span style={{ fontSize: 9, color: "var(--text-muted)" }}>🪨 Regolith Samples</span>
-            <span style={{ fontSize: 10, fontWeight: 700, color: "#c4956a", fontFamily: "var(--font-code)" }}>
-              {inventory.regolith}u
-            </span>
-          </div>
-        )}
       </div>
 
       {/* Subsurface Scan & Position */}
@@ -297,10 +278,9 @@ export default function HUD({ roverState, totalActions, isFinished }: HUDProps) 
           Tile Legend
         </div>
         {[
-          { color: "#00ffaa", label: "Lithium Brine (⚡)" },
-          { color: "#d946ef", label: "Alien Xenocryst (💎)" },
-          { color: "#38bdf8", label: "Titanium Matrix (🛡)" },
-          { color: "#f97316", label: "Hematite Concretion (🪐)" },
+          { color: "#f97316", label: "Cuprion (🪙)" },
+          { color: "#00ffaa", label: "Pythorium (🐍)" },
+          { color: "#38bdf8", label: "Javium (☕)" },
           { color: "#c4956a", label: "Martian Sand" },
           { color: "#00d4ff", label: "Lander Start Site" },
           { color: "#2a1508", label: "Drilled Borehole Crater" },

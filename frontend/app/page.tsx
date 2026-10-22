@@ -5,6 +5,7 @@ import dynamic from "next/dynamic";
 
 import Toolbar from "@/components/UI/Toolbar";
 import Terminal, { LogEntry } from "@/components/IDE/Terminal";
+import Storage from "@/components/IDE/Storage";
 import IsometricGrid from "@/components/Canvas/IsometricGrid";
 import { useRoverAnimation, RoverAction } from "@/components/Canvas/useRoverAnimation";
 import { DEFAULT_CODES } from "@/components/IDE/CodeEditor";
@@ -206,7 +207,7 @@ export default function Home() {
       if (dep && !dep.depleted) {
         msg = `🔬 Scan: Rich ${dep.type.toUpperCase()} deposit detected (${dep.remainingAmount}u reserves)`;
       } else {
-        msg = `🔬 Scan: Barren basaltic regolith. No rich mineral vein detected.`;
+        msg = `🔬 Scan: Barren basaltic terrain. No rich mineral vein detected.`;
       }
     }
     queueMicrotask(() => {
@@ -289,159 +290,135 @@ export default function Home() {
       {/* Main visual workspace */}
       <div style={{ display: "flex", flex: 1, overflow: "hidden", position: "relative" }}>
 
-        {/* LEFT HAND — CODE EDITOR & CONSOLE */}
+        {/* MISSION WINDOW — TOP LEFT (OVER MAP) */}
         <div
           style={{
-            aspectRatio: "9 / 16",
-            flexShrink: 0,
+            position: "absolute",
+            top: 0,
+            left: 0,
+            zIndex: 10,
+            width: "clamp(420px, 44vw, 760px)",
+            height: "100%",
             display: "flex",
             flexDirection: "column",
-            borderRight: "1px solid var(--space-border)",
-            background: "rgba(13, 17, 23, 1)",
+            pointerEvents: "none",
           }}
         >
-          {/* Window Header */}
           <div
             style={{
-              display: "flex",
-              alignItems: "center",
-              justifyContent: "space-between",
-              padding: "8px 12px",
-              background: "rgba(17, 24, 39, 0.95)",
-              borderBottom: "1px solid var(--space-border)",
+              height: "clamp(320px, 60%, 600px)",
               flexShrink: 0,
+              display: "flex",
+              flexDirection: "column",
+              pointerEvents: "auto",
             }}
           >
-            {/* Tabs */}
-            <div
-              style={{
-                display: "flex",
-                alignItems: "center",
-                gap: 4,
-                background: "rgba(0,0,0,0.35)",
-                padding: "2px 4px",
-                borderRadius: "var(--radius-sm)",
-                border: "1px solid rgba(255,255,255,0.06)",
-              }}
-            >
-              <button
-                type="button"
-                onClick={() => setActiveTab("code")}
-                style={{
-                  display: "flex",
-                  alignItems: "center",
-                  gap: 6,
-                  padding: "4px 10px",
-                  borderRadius: "var(--radius-sm)",
-                  border: "none",
-                  background: activeTab === "code" ? "var(--space-card)" : "transparent",
-                  color: activeTab === "code" ? "var(--text-primary)" : "var(--text-muted)",
-                  fontFamily: "var(--font-code)",
-                  fontSize: 12,
-                  fontWeight: 600,
-                  cursor: "pointer",
-                }}
-              >
-                <span>{language === "python" ? "🐍" : language === "cpp" ? "⚙️" : "☕"}</span>
-                <span>{language === "python" ? "mission.py" : language === "cpp" ? "main.cpp" : "Main.java"}</span>
-              </button>
-
-              <button
-                type="button"
-                onClick={() => setActiveTab("console")}
-                style={{
-                  display: "flex",
-                  alignItems: "center",
-                  gap: 6,
-                  padding: "4px 10px",
-                  borderRadius: "var(--radius-sm)",
-                  border: "none",
-                  background: activeTab === "console" ? "var(--space-card)" : "transparent",
-                  color: activeTab === "console" ? "var(--glow-cyan)" : "var(--text-muted)",
-                  fontFamily: "var(--font-code)",
-                  fontSize: 12,
-                  fontWeight: 600,
-                  cursor: "pointer",
-                }}
-              >
-                <span>&gt;_</span>
-                <span>Terminal</span>
-                {logs.length > 0 && (
-                  <span
-                    style={{
-                      fontSize: 9,
-                      padding: "1px 5px",
-                      borderRadius: 8,
-                      background: "rgba(0,212,255,0.2)",
-                      color: "var(--glow-cyan)",
-                    }}
-                  >
-                    {logs.length}
-                  </span>
-                )}
-              </button>
-            </div>
-          </div>
-
-          {/* Window Content */}
-          <div style={{ flex: 1, overflow: "hidden", position: "relative" }}>
             {activeTab === "code" ? (
-              <CodeEditor
-                value={code}
-                onChange={setCode}
-                language={language}
-                readOnly={isRunning}
-              />
+            <div style={{ flex: 1, display: "flex", padding: 10, minHeight: 0 }}>
+              <div
+                style={{
+                  flex: 1,
+                  display: "flex",
+                  flexDirection: "column",
+                  overflow: "hidden",
+                  background: "#0b0f17",
+                  border: "1px solid var(--space-border)",
+                  borderRadius: "var(--radius-md)",
+                  boxShadow: "0 8px 24px rgba(0, 0, 0, 0.35)",
+                }}
+              >
+                {/* Window Header */}
+                <div
+                  style={{
+                    display: "flex",
+                    alignItems: "center",
+                    justifyContent: "space-between",
+                    padding: "7px 12px",
+                    borderBottom: "1px solid var(--space-border)",
+                    background: "#0d121b",
+                    flexShrink: 0,
+                  }}
+                >
+                  <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+                    <span style={{ display: "flex", alignItems: "center", gap: 5 }}>
+                      <span className="window-btn window-btn--red" style={{ width: 10, height: 10 }} />
+                      <span className="window-btn window-btn--yellow" style={{ width: 10, height: 10 }} />
+                      <span className="window-btn window-btn--green" style={{ width: 10, height: 10 }} />
+                    </span>
+                    <span style={{ display: "flex", alignItems: "center", gap: 5, fontSize: 11, color: "var(--text-secondary)", fontWeight: 500 }}>
+                      {language !== "python" && (
+                        <span>{language === "cpp" ? "⚙️" : "☕"}</span>
+                      )}
+                      <span style={{ fontFamily: "var(--font-code)" }}>
+                        {language === "python" ? "mission.py" : language === "cpp" ? "main.cpp" : "Main.java"}
+                      </span>
+                    </span>
+                  </div>
+
+                  <button
+                    type="button"
+                    onClick={() => setActiveTab("console")}
+                    style={{
+                      display: "flex",
+                      alignItems: "center",
+                      gap: 4,
+                      background: "transparent",
+                      border: "none",
+                      color: "var(--text-muted)",
+                      fontFamily: "var(--font-code)",
+                      fontSize: 10.5,
+                      cursor: "pointer",
+                      padding: "2px 6px",
+                      borderRadius: "var(--radius-sm)",
+                      transition: "color 0.15s",
+                    }}
+                    onMouseEnter={(e) => ((e.target as HTMLElement).style.color = "var(--text-primary)")}
+                    onMouseLeave={(e) => ((e.target as HTMLElement).style.color = "var(--text-muted)")}
+                  >
+                    <span>&gt;_</span>
+                    <span>Terminal</span>
+                    {logs.length > 0 && (
+                      <span
+                        style={{
+                          fontSize: 9,
+                          padding: "1px 5px",
+                          borderRadius: 8,
+                          background: "rgba(0,212,255,0.2)",
+                          color: "var(--glow-cyan)",
+                        }}
+                      >
+                        {logs.length}
+                      </span>
+                    )}
+                  </button>
+                </div>
+
+                {/* Window Content */}
+                <div style={{ flex: 1, overflow: "hidden", position: "relative" }}>
+                  <CodeEditor
+                    value={code}
+                    onChange={setCode}
+                    language={language}
+                    readOnly={isRunning}
+                  />
+                </div>
+              </div>
+            </div>
             ) : (
               <Terminal
                 logs={logs}
                 onClear={() => setLogs([])}
                 onRunScript={handleRun}
                 roverState={roverState}
+                onShowCode={() => setActiveTab("code")}
               />
             )}
           </div>
 
-          {/* Window Footer */}
-          <div
-            style={{
-              display: "flex",
-              alignItems: "center",
-              justifyContent: "space-between",
-              padding: "8px 12px",
-              background: "rgba(13, 17, 23, 0.95)",
-              borderTop: "1px solid var(--space-border)",
-              flexShrink: 0,
-            }}
-          >
-            <span style={{ fontSize: 10.5, color: "var(--text-muted)", fontFamily: "var(--font-code)" }}>
-              💡 Type <b style={{ color: "var(--glow-cyan)" }}>/help</b> in Terminal
-            </span>
-
-            <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
-              <button
-                type="button"
-                className="btn btn--ghost"
-                onClick={reset}
-                disabled={!actions.length}
-                style={{ padding: "3px 8px", fontSize: 11 }}
-              >
-                ↺ Reset
-              </button>
-              <button
-                type="button"
-                className="btn btn--primary"
-                onClick={handleRun}
-                disabled={isRunning}
-                style={{ padding: "4px 12px", fontSize: 11 }}
-              >
-                {isRunning ? "Running…" : "▶ Run Script"}
-              </button>
-            </div>
-          </div>
+          <Storage roverState={roverState} />
         </div>
 
-        {/* FULLSCREEN BACKGROUND 9X9 CANVAS */}
+        {/* MAP — FULL AREA */}
         <div style={{ flex: 1, width: "100%", height: "100%", position: "relative" }}>
           <IsometricGrid
             roverState={roverState}

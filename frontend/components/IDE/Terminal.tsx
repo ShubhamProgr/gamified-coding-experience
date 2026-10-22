@@ -17,6 +17,7 @@ interface TerminalProps {
   onClear: () => void;
   onRunScript?: () => void;
   roverState?: RoverState;
+  onShowCode?: () => void;
 }
 
 interface CommandOutput {
@@ -39,23 +40,6 @@ function getActionColor(action?: string): string {
   }
 }
 
-function getTypeIcon(type: LogEntry["type"], action?: string): string {
-  if (type === "error")   return "✕";
-  if (type === "system")  return "◈";
-  if (type === "info")    return "ℹ";
-  if (type === "command") return "❯";
-  if (type === "output")  return " ";
-  switch (action) {
-    case "DRIVE":  return "➤";
-    case "DRILL":  return "⛏";
-    case "SCAN":   return "◉";
-    case "CHARGE": return "⚡";
-    case "TURN":   return "↻";
-    case "LOG":    return "▸";
-    default:       return "●";
-  }
-}
-
 function formatTime(ms: number): string {
   const d = new Date(ms);
   return d.toLocaleTimeString("en-US", {
@@ -66,41 +50,38 @@ function formatTime(ms: number): string {
   });
 }
 
-const HELP_MESSAGE = `══════════════════════════════════════════════════════════════
-CURRENT MISSION TASK: Sector 9×9 Geological Survey
-══════════════════════════════════════════════════════════════
-Objectives:
-  1. Rover deployed at central Base Station (4, 4).
-  2. Navigate 1 tile FRONT to (4, 3) to detect Lithium Brine.
-  3. Scan subsurface vein and extract crystals with rover.drill().
-  4. Navigate RIGHT & BACK to (5, 4) to harvest Titanium Matrix reserves.
-  5. Explore the expanded 9×9 sector (81 tiles) for rare Xenocrysts!
+const HELP_MESSAGE = `CURRENT MISSION — Sector 9×9 Geological Survey
 
-══════════════════════════════════════════════════════════════
-AVAILABLE SDK FUNCTIONS
-══════════════════════════════════════════════════════════════
-  • rover.drive(dir)       Move 1 tile ("FRONT"|"BACK"|"RIGHT"|"LEFT")
-  • rover.drill()          Extract minerals & samples at current tile
-  • rover.scan()           Scan tile subsurface for veins & reserves
-  • rover.charge(amt=10)   Recharge battery (+10% power)
-  • rover.turn_left()      Rotate rover facing 90° CCW
-  • rover.turn_right()     Rotate rover facing 90° CW
-  • rover.get_position()   Query current (col, row) coordinates
-  • rover.log(msg)         Send custom log message to terminal
+Objectives
+  1. Start at the central Base Station.
+  2. Drive FRONT and drill to extract Cuprion.
+  3. Scan nearby tiles for Pythorium deposits.
+  4. Explore the sector to find rare Javium.
+  5. Fill your cargo hold before the battery runs out.
 
-TERMINAL COMMANDS:
-  /help                    Show this mission guide & SDK reference
-  /task                    Display current mission objectives
-  /run                     Execute the script in the code editor
-  /status                  Print real-time rover telemetry
-  /clear                   Clear terminal screen
-══════════════════════════════════════════════════════════════`;
+Rover SDK
+  rover.drive(dir)      Move one tile: FRONT | BACK | LEFT | RIGHT
+  rover.drill()         Extract minerals at the current tile
+  rover.scan()          Scan the current tile for deposits
+  rover.charge(amt)     Recharge battery (default +10%)
+  rover.turn_left()     Rotate 90° counter-clockwise
+  rover.turn_right()    Rotate 90° clockwise
+  rover.get_position()  Get current (col, row)
+  rover.log(msg)        Print a custom message
+
+Commands
+  /help     Show this guide
+  /task     Show mission objectives
+  /run      Run the editor script
+  /status   Print rover telemetry
+  /clear    Clear the terminal`;
 
 export default function Terminal({
   logs,
   onClear,
   onRunScript,
   roverState,
+  onShowCode,
 }: TerminalProps) {
   const [inputVal, setInputVal] = useState("");
   const [history, setHistory] = useState<string[]>([]);
@@ -109,7 +90,7 @@ export default function Terminal({
     {
       id: "init-banner",
       type: "system",
-      text: "Mars Rover Mission Terminal [v2.4.0-sector15x15]\nType /help for current mission task and SDK functions reference.",
+      text: "Mars Rover Terminal v2.4.0\nType /help to view mission objectives and the SDK reference.",
       timestamp: Date.now(),
     },
   ]);
@@ -152,8 +133,8 @@ export default function Terminal({
         },
       ]);
     } else if (cmdLower === "/task" || cmdLower === "task") {
-      const taskMsg = `Current Mission: Sector 9×9 Geological Survey
-Target: Start at Base Station (4, 4). Move FRONT to (4, 3) for Lithium Brine. Drill twice, then survey to (5, 4) for Titanium Matrix. Explore all 81 sector tiles!`;
+      const taskMsg = `Current Mission: Sector Geological Survey
+Target: Collect Cuprion, Pythorium, and Javium. Drill mineral deposits, scan unknown tiles, and keep your battery above zero.`;
       setCustomOutputs((prev) => [
         ...prev,
         userEntry,
@@ -242,192 +223,195 @@ Target: Start at Base Station (4, 4). Move FRONT to (4, 3) for Lithium Brine. Dr
     <div
       style={{
         display: "flex",
-        flexDirection: "column",
         height: "100%",
-        overflow: "hidden",
-        background: "#080b11",
+        padding: 10,
+        background: "transparent",
         fontFamily: "var(--font-code)",
       }}
       onClick={() => inputRef.current?.focus()}
     >
-      {/* Minimalist Terminal Header */}
-      <div
-        style={{
-          display: "flex",
-          alignItems: "center",
-          justifyContent: "space-between",
-          padding: "6px 12px",
-          borderBottom: "1px solid rgba(255, 255, 255, 0.07)",
-          background: "#0b0f17",
-          flexShrink: 0,
-        }}
-      >
-        <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-          <span style={{ fontSize: 11, color: "var(--glow-cyan)", fontWeight: 600 }}>
-            terminal:rover@control
-          </span>
-          <span
-            style={{
-              fontSize: 10,
-              color: "var(--text-muted)",
-              padding: "1px 6px",
-              background: "rgba(255, 255, 255, 0.04)",
-              borderRadius: 3,
-            }}
-          >
-            type <b style={{ color: "var(--glow-cyan)" }}>/help</b>
-          </span>
-        </div>
-
-        <button
-          type="button"
-          onClick={(e) => {
-            e.stopPropagation();
-            setCustomOutputs([]);
-            onClear();
-          }}
-          title="Clear Terminal (/clear)"
-          style={{
-            background: "transparent",
-            border: "none",
-            color: "var(--text-muted)",
-            fontSize: 10,
-            cursor: "pointer",
-            padding: "2px 6px",
-            borderRadius: 3,
-            transition: "color 0.15s",
-          }}
-          onMouseEnter={(e) => ((e.target as HTMLElement).style.color = "var(--text-primary)")}
-          onMouseLeave={(e) => ((e.target as HTMLElement).style.color = "var(--text-muted)")}
-        >
-          Clear
-        </button>
-      </div>
-
-      {/* Terminal Stream Output */}
       <div
         style={{
           flex: 1,
-          overflowY: "auto",
-          padding: "8px 12px",
-          fontSize: 11.5,
-          lineHeight: 1.5,
           display: "flex",
           flexDirection: "column",
-          gap: 4,
+          overflow: "hidden",
+          background: "#0b0f17",
+          border: "1px solid var(--space-border)",
+          borderRadius: "var(--radius-md)",
+          boxShadow: "0 8px 24px rgba(0, 0, 0, 0.35)",
         }}
       >
-        {/* Render custom terminal outputs */}
-        {customOutputs.map((item) => (
-          <div key={item.id} style={{ whiteSpace: "pre-wrap", wordBreak: "break-word" }}>
-            {item.type === "command" ? (
-              <div style={{ display: "flex", alignItems: "center", gap: 6, color: "var(--glow-cyan)" }}>
-                <span style={{ color: "var(--glow-green)", fontWeight: 600 }}>rover@mars:~$</span>
-                <span>{item.text}</span>
-              </div>
-            ) : item.type === "system" ? (
-              <div style={{ color: "var(--glow-cyan-dim)", fontStyle: "italic" }}>
-                {item.text}
-              </div>
-            ) : (
-              <div
-                style={{
-                  color: "#d1d5db",
-                  background: "rgba(0, 212, 255, 0.03)",
-                  padding: "6px 8px",
-                  borderRadius: 4,
-                  borderLeft: "2px solid var(--glow-cyan)",
-                  marginTop: 2,
-                  marginBottom: 2,
-                }}
-              >
-                {item.text}
-              </div>
-            )}
-          </div>
-        ))}
-
-        {/* Render real-time rover execution logs */}
-        {logs.map((log) => {
-          const isError = log.type === "error";
-          const isSystem = log.type === "system";
-          const color = isError
-            ? "var(--glow-red)"
-            : isSystem
-            ? "var(--text-muted)"
-            : getActionColor(log.action);
-
-          return (
-            <div
-              key={log.id}
-              style={{
-                display: "flex",
-                alignItems: "flex-start",
-                gap: 6,
-                color: isError ? "var(--glow-red)" : isSystem ? "var(--text-muted)" : "#c9d1d9",
-              }}
-            >
-              <span style={{ color: "var(--text-muted)", fontSize: 10, flexShrink: 0 }}>
-                {formatTime(log.timestamp)}
-              </span>
-              <span style={{ color, flexShrink: 0 }}>
-                {getTypeIcon(log.type, log.action)}
-              </span>
-              {log.action && (
-                <span style={{ color, fontWeight: 600, flexShrink: 0 }}>
-                  [{log.action}]
-                </span>
-              )}
-              <span style={{ wordBreak: "break-word" }}>{log.message}</span>
-            </div>
-          );
-        })}
-
-        <div ref={bottomRef} />
-      </div>
-
-      {/* Interactive Command Input Line */}
-      <div
-        style={{
-          display: "flex",
-          alignItems: "center",
-          gap: 6,
-          padding: "8px 12px",
-          borderTop: "1px solid rgba(255, 255, 255, 0.07)",
-          background: "#0a0e16",
-          flexShrink: 0,
-        }}
-      >
-        <span
+        {/* Window Header */}
+        <div
           style={{
-            color: "var(--glow-green)",
-            fontWeight: 700,
-            fontSize: 12,
-            userSelect: "none",
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "space-between",
+            padding: "7px 12px",
+            borderBottom: "1px solid var(--space-border)",
+            background: "#0d121b",
             flexShrink: 0,
           }}
         >
-          rover@mars:~$
-        </span>
-        <input
-          ref={inputRef}
-          type="text"
-          value={inputVal}
-          onChange={(e) => setInputVal(e.target.value)}
-          onKeyDown={onKeyDown}
-          placeholder="type /help or /run..."
+          <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+            <span style={{ display: "flex", alignItems: "center", gap: 5 }}>
+              <span className="window-btn window-btn--red" style={{ width: 10, height: 10 }} />
+              <span className="window-btn window-btn--yellow" style={{ width: 10, height: 10 }} />
+              <span className="window-btn window-btn--green" style={{ width: 10, height: 10 }} />
+            </span>
+            <span style={{ fontSize: 11, color: "var(--text-secondary)", fontWeight: 500 }}>
+              Terminal
+            </span>
+          </div>
+
+          <div style={{ display: "flex", alignItems: "center", gap: 4 }}>
+            {onShowCode && (
+              <button
+                type="button"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  onShowCode();
+                }}
+                style={{
+                  background: "transparent",
+                  border: "none",
+                  color: "var(--text-muted)",
+                  fontFamily: "var(--font-code)",
+                  fontSize: 10.5,
+                  cursor: "pointer",
+                  padding: "2px 6px",
+                  borderRadius: "var(--radius-sm)",
+                  transition: "color 0.15s",
+                }}
+                onMouseEnter={(e) => ((e.target as HTMLElement).style.color = "var(--text-primary)")}
+                onMouseLeave={(e) => ((e.target as HTMLElement).style.color = "var(--text-muted)")}
+              >
+                Code
+              </button>
+            )}
+            <button
+              type="button"
+              onClick={(e) => {
+                e.stopPropagation();
+                setCustomOutputs([]);
+                onClear();
+              }}
+              title="Clear Terminal (/clear)"
+              style={{
+                background: "transparent",
+                border: "none",
+                color: "var(--text-muted)",
+                fontFamily: "var(--font-code)",
+                fontSize: 10.5,
+                cursor: "pointer",
+                padding: "2px 6px",
+                borderRadius: "var(--radius-sm)",
+                transition: "color 0.15s",
+              }}
+              onMouseEnter={(e) => ((e.target as HTMLElement).style.color = "var(--text-primary)")}
+              onMouseLeave={(e) => ((e.target as HTMLElement).style.color = "var(--text-muted)")}
+            >
+              Clear
+            </button>
+          </div>
+        </div>
+
+        {/* Output */}
+        <div
           style={{
             flex: 1,
-            background: "transparent",
-            border: "none",
-            outline: "none",
-            color: "var(--text-primary)",
-            fontFamily: "var(--font-code)",
+            overflowY: "auto",
+            padding: "10px 12px",
             fontSize: 12,
+            lineHeight: 1.6,
+            display: "flex",
+            flexDirection: "column",
+            gap: 3,
           }}
-          spellCheck={false}
-          autoComplete="off"
-        />
+        >
+          {customOutputs.map((item) => (
+            <div key={item.id} style={{ whiteSpace: "pre-wrap", wordBreak: "break-word" }}>
+              {item.type === "command" ? (
+                <div style={{ display: "flex", gap: 6, color: "var(--glow-cyan)" }}>
+                  <span style={{ color: "var(--glow-green)" }}>❯</span>
+                  <span>{item.text}</span>
+                </div>
+              ) : item.type === "system" ? (
+                <div style={{ color: "var(--text-muted)" }}>{item.text}</div>
+              ) : (
+                <div style={{ color: "var(--text-code)" }}>{item.text}</div>
+              )}
+            </div>
+          ))}
+
+          {/* Real-time rover execution logs */}
+          {logs.map((log) => {
+            const isError = log.type === "error";
+            const isSystem = log.type === "system";
+            const color = isError
+              ? "var(--glow-red)"
+              : isSystem
+              ? "var(--text-muted)"
+              : getActionColor(log.action);
+
+            return (
+              <div
+                key={log.id}
+                style={{
+                  display: "flex",
+                  alignItems: "baseline",
+                  gap: 6,
+                  color: isError ? "var(--glow-red)" : "#c9d1d9",
+                }}
+              >
+                <span style={{ color: "var(--text-muted)", fontSize: 10, flexShrink: 0 }}>
+                  {formatTime(log.timestamp)}
+                </span>
+                {log.action && (
+                  <span style={{ color, fontWeight: 600, flexShrink: 0 }}>{log.action}</span>
+                )}
+                <span style={{ wordBreak: "break-word" }}>{log.message}</span>
+              </div>
+            );
+          })}
+
+          <div ref={bottomRef} />
+        </div>
+
+        {/* Input */}
+        <div
+          style={{
+            display: "flex",
+            alignItems: "center",
+            gap: 6,
+            padding: "9px 12px",
+            borderTop: "1px solid var(--space-border)",
+            background: "#0a0e16",
+            flexShrink: 0,
+          }}
+        >
+          <span style={{ color: "var(--glow-green)", fontSize: 12, userSelect: "none" }}>❯</span>
+          <input
+            ref={inputRef}
+            type="text"
+            value={inputVal}
+            onChange={(e) => setInputVal(e.target.value)}
+            onKeyDown={onKeyDown}
+            placeholder="/help for commands…"
+            style={{
+              flex: 1,
+              background: "transparent",
+              border: "none",
+              outline: "none",
+              color: "var(--text-primary)",
+              fontFamily: "var(--font-code)",
+              fontSize: 12,
+            }}
+            spellCheck={false}
+            autoComplete="off"
+          />
+        </div>
       </div>
     </div>
   );

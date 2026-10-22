@@ -17,6 +17,7 @@ export const TILE_W = 104;
 export const TILE_H = 52;
 const MIN_ZOOM = 0.4;
 const MAX_ZOOM = 2.8;
+const DEFAULT_ZOOM = 1.15;
 const ZOOM_STEP = 0.15;
 
 // ── Tile types ─────────────────────────────────────────────────────────────
@@ -198,7 +199,7 @@ function drawCrystalCluster(
     ctx.fill();
   }
 
-  if (deposit.type === "xenocryst" || deposit.type === "lithium") {
+  if (deposit.type === "pythorium" || deposit.type === "javium") {
     const sparkT = (time * 0.002 + deposit.col) % 1;
     const sparkX = Math.sin(time * 0.004) * 6;
     const sparkY = -12 - sparkT * 8;
@@ -461,8 +462,9 @@ export default function IsometricGrid({
   });
   const rafRef = useRef<number | null>(null);
 
-  const [zoom, setZoom] = useState(1.0);
+  const [zoom, setZoom] = useState(DEFAULT_ZOOM);
   const [pan, setPan] = useState({ x: 0, y: 0 });
+  const panInitializedRef = useRef(false);
   const [isDragging, setIsDragging] = useState(false);
   const [containerSize, setContainerSize] = useState({ width: 0, height: 0 });
   const dragStartRef = useRef({ x: 0, y: 0, panX: 0, panY: 0 });
@@ -608,6 +610,18 @@ export default function IsometricGrid({
     return () => obs.disconnect();
   }, [draw]);
 
+  // Center the map in the empty area to the right of the mission window
+  useEffect(() => {
+    if (!panInitializedRef.current && containerSize.width > 0) {
+      panInitializedRef.current = true;
+      const missionWindowWidth = Math.min(
+        760,
+        Math.max(420, containerSize.width * 0.44)
+      );
+      setPan({ x: missionWindowWidth / 2, y: 0 });
+    }
+  }, [containerSize.width]);
+
   // Pan/zoom handlers
   const handlePointerDown = (e: React.PointerEvent<HTMLDivElement>) => {
     if (e.button !== 0) return;
@@ -660,8 +674,10 @@ export default function IsometricGrid({
 
   const handleResetView = (e: React.MouseEvent) => {
     e.stopPropagation();
-    setZoom(1.0);
-    setPan({ x: 0, y: 0 });
+    const w = containerRef.current?.clientWidth ?? 0;
+    const missionWindowWidth = Math.min(760, Math.max(420, w * 0.44));
+    setZoom(DEFAULT_ZOOM);
+    setPan({ x: missionWindowWidth / 2, y: 0 });
   };
 
   const handleCenterRover = (e: React.MouseEvent) => {

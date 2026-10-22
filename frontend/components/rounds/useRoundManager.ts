@@ -39,11 +39,9 @@ export interface RoundManagerAPI {
 // ── Hook ──────────────────────────────────────────────────────────────────
 
 const EMPTY_INVENTORY: RoverInventory = {
-  lithium: 0,
-  xenocryst: 0,
-  titanium: 0,
-  hematite: 0,
-  regolith: 0,
+  cuprion: 0,
+  pythorium: 0,
+  javium: 0,
 };
 
 const INITIAL_STATE: RoundManagerState = {

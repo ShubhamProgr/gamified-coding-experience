@@ -212,7 +212,7 @@ export default function RoundCompleteModal({
               marginTop: 2,
             }}
           >
-            {(["lithium", "xenocryst", "titanium", "hematite"] as const).map((type) => {
+            {(["cuprion", "pythorium", "javium"] as const).map((type) => {
               const meta = MINERAL_METAS[type];
               const count = inventory[type] || 0;
               return (

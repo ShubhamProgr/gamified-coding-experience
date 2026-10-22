@@ -314,7 +314,7 @@ export default function VictoryScreen({
                 marginTop: 4,
               }}
             >
-              {(["lithium", "xenocryst", "titanium", "hematite"] as const)
+              {(["cuprion", "pythorium", "javium"] as const)
                 .filter((t) => inventory[t] > 0)
                 .map((type) => {
                   const meta = MINERAL_METAS[type];

@@ -258,60 +258,60 @@ export interface RoundDepositConfig {
 
 export const ROUND2_DEPOSITS: RoundDepositConfig[] = [
   // Central (avoiding radiation at 5,5 and 9,6)
-  { id: "r2-1",  col: 7, row: 6, type: "lithium",   totalAmount: 70,  remainingAmount: 70,  maxYieldPerDrill: 35 },
-  { id: "r2-2",  col: 8, row: 7, type: "titanium",  totalAmount: 70,  remainingAmount: 70,  maxYieldPerDrill: 35 },
-  { id: "r2-3",  col: 6, row: 7, type: "hematite",  totalAmount: 80,  remainingAmount: 80,  maxYieldPerDrill: 40 },
-  { id: "r2-4",  col: 8, row: 6, type: "xenocryst", totalAmount: 60,  remainingAmount: 60,  maxYieldPerDrill: 30 },
-  { id: "r2-5",  col: 5, row: 7, type: "hematite",  totalAmount: 70,  remainingAmount: 70,  maxYieldPerDrill: 35 },
+  { id: "r2-1",  col: 7, row: 6, type: "cuprion",   totalAmount: 70,  remainingAmount: 70,  maxYieldPerDrill: 35 },
+  { id: "r2-2",  col: 8, row: 7, type: "pythorium",  totalAmount: 70,  remainingAmount: 70,  maxYieldPerDrill: 35 },
+  { id: "r2-3",  col: 6, row: 7, type: "javium",  totalAmount: 80,  remainingAmount: 80,  maxYieldPerDrill: 40 },
+  { id: "r2-4",  col: 8, row: 6, type: "cuprion", totalAmount: 60,  remainingAmount: 60,  maxYieldPerDrill: 30 },
+  { id: "r2-5",  col: 5, row: 7, type: "pythorium",  totalAmount: 70,  remainingAmount: 70,  maxYieldPerDrill: 35 },
   // North
-  { id: "r2-6",  col: 4, row: 4, type: "titanium",  totalAmount: 90,  remainingAmount: 90,  maxYieldPerDrill: 45 },
-  { id: "r2-7",  col: 7, row: 4, type: "lithium",   totalAmount: 80,  remainingAmount: 80,  maxYieldPerDrill: 40 },
-  { id: "r2-8",  col: 10, row: 4, type: "xenocryst", totalAmount: 70,  remainingAmount: 70,  maxYieldPerDrill: 35 },
+  { id: "r2-6",  col: 4, row: 4, type: "javium",  totalAmount: 90,  remainingAmount: 90,  maxYieldPerDrill: 45 },
+  { id: "r2-7",  col: 7, row: 4, type: "cuprion",   totalAmount: 80,  remainingAmount: 80,  maxYieldPerDrill: 40 },
+  { id: "r2-8",  col: 10, row: 4, type: "pythorium", totalAmount: 70,  remainingAmount: 70,  maxYieldPerDrill: 35 },
   // East
-  { id: "r2-9",  col: 13, row: 6, type: "hematite",  totalAmount: 80,  remainingAmount: 80,  maxYieldPerDrill: 40 },
-  { id: "r2-10", col: 14, row: 8, type: "titanium",  totalAmount: 75,  remainingAmount: 75,  maxYieldPerDrill: 35 },
+  { id: "r2-9",  col: 13, row: 6, type: "javium",  totalAmount: 80,  remainingAmount: 80,  maxYieldPerDrill: 40 },
+  { id: "r2-10", col: 14, row: 8, type: "cuprion",  totalAmount: 75,  remainingAmount: 75,  maxYieldPerDrill: 35 },
   // South
-  { id: "r2-11", col: 4, row: 12, type: "lithium",   totalAmount: 85,  remainingAmount: 85,  maxYieldPerDrill: 40 },
-  { id: "r2-12", col: 7, row: 11, type: "xenocryst", totalAmount: 70,  remainingAmount: 70,  maxYieldPerDrill: 35 },
-  { id: "r2-13", col: 9, row: 11, type: "hematite",  totalAmount: 80,  remainingAmount: 80,  maxYieldPerDrill: 40 },
+  { id: "r2-11", col: 4, row: 12, type: "pythorium",   totalAmount: 85,  remainingAmount: 85,  maxYieldPerDrill: 40 },
+  { id: "r2-12", col: 7, row: 11, type: "javium", totalAmount: 70,  remainingAmount: 70,  maxYieldPerDrill: 35 },
+  { id: "r2-13", col: 9, row: 11, type: "cuprion",  totalAmount: 80,  remainingAmount: 80,  maxYieldPerDrill: 40 },
   // West
-  { id: "r2-14", col: 1, row: 7, type: "lithium",   totalAmount: 75,  remainingAmount: 75,  maxYieldPerDrill: 35 },
-  { id: "r2-15", col: 1, row: 8, type: "xenocryst", totalAmount: 65,  remainingAmount: 65,  maxYieldPerDrill: 30 },
+  { id: "r2-14", col: 1, row: 7, type: "pythorium",   totalAmount: 75,  remainingAmount: 75,  maxYieldPerDrill: 35 },
+  { id: "r2-15", col: 1, row: 8, type: "javium", totalAmount: 65,  remainingAmount: 65,  maxYieldPerDrill: 30 },
   // Corners
-  { id: "r2-16", col: 11, row: 3, type: "titanium",  totalAmount: 100, remainingAmount: 100, maxYieldPerDrill: 50 },
-  { id: "r2-17", col: 3, row: 11, type: "hematite",  totalAmount: 95,  remainingAmount: 95,  maxYieldPerDrill: 45 },
-  { id: "r2-18", col: 10, row: 11, type: "xenocryst", totalAmount: 100, remainingAmount: 100, maxYieldPerDrill: 50 },
+  { id: "r2-16", col: 11, row: 3, type: "cuprion",  totalAmount: 100, remainingAmount: 100, maxYieldPerDrill: 50 },
+  { id: "r2-17", col: 3, row: 11, type: "pythorium",  totalAmount: 95,  remainingAmount: 95,  maxYieldPerDrill: 45 },
+  { id: "r2-18", col: 10, row: 11, type: "javium", totalAmount: 100, remainingAmount: 100, maxYieldPerDrill: 50 },
 ];
 
 export const ROUND3_DEPOSITS: RoundDepositConfig[] = [
   // Dense central cluster
-  { id: "r3-1",  col: 7, row: 7, type: "xenocryst", totalAmount: 100, remainingAmount: 100, maxYieldPerDrill: 50 },
-  { id: "r3-2",  col: 6, row: 6, type: "lithium",   totalAmount: 90,  remainingAmount: 90,  maxYieldPerDrill: 45 },
-  { id: "r3-3",  col: 8, row: 6, type: "titanium",  totalAmount: 90,  remainingAmount: 90,  maxYieldPerDrill: 45 },
-  { id: "r3-4",  col: 5, row: 7, type: "hematite",  totalAmount: 90,  remainingAmount: 90,  maxYieldPerDrill: 45 },
-  { id: "r3-5",  col: 8, row: 7, type: "lithium",   totalAmount: 80,  remainingAmount: 80,  maxYieldPerDrill: 40 },
+  { id: "r3-1",  col: 7, row: 7, type: "cuprion", totalAmount: 100, remainingAmount: 100, maxYieldPerDrill: 50 },
+  { id: "r3-2",  col: 6, row: 6, type: "pythorium",   totalAmount: 90,  remainingAmount: 90,  maxYieldPerDrill: 45 },
+  { id: "r3-3",  col: 8, row: 6, type: "javium",  totalAmount: 90,  remainingAmount: 90,  maxYieldPerDrill: 45 },
+  { id: "r3-4",  col: 5, row: 7, type: "cuprion",  totalAmount: 90,  remainingAmount: 90,  maxYieldPerDrill: 45 },
+  { id: "r3-5",  col: 8, row: 7, type: "pythorium",   totalAmount: 80,  remainingAmount: 80,  maxYieldPerDrill: 40 },
   // North
-  { id: "r3-6",  col: 3, row: 3, type: "titanium",  totalAmount: 110, remainingAmount: 110, maxYieldPerDrill: 55 },
-  { id: "r3-7",  col: 6, row: 4, type: "xenocryst", totalAmount: 95,  remainingAmount: 95,  maxYieldPerDrill: 45 },
-  { id: "r3-8",  col: 9, row: 4, type: "lithium",   totalAmount: 90,  remainingAmount: 90,  maxYieldPerDrill: 45 },
-  { id: "r3-9",  col: 12, row: 3, type: "hematite",  totalAmount: 110, remainingAmount: 110, maxYieldPerDrill: 55 },
+  { id: "r3-6",  col: 3, row: 3, type: "javium",  totalAmount: 110, remainingAmount: 110, maxYieldPerDrill: 55 },
+  { id: "r3-7",  col: 6, row: 4, type: "cuprion", totalAmount: 95,  remainingAmount: 95,  maxYieldPerDrill: 45 },
+  { id: "r3-8",  col: 9, row: 4, type: "pythorium",   totalAmount: 90,  remainingAmount: 90,  maxYieldPerDrill: 45 },
+  { id: "r3-9",  col: 12, row: 3, type: "javium",  totalAmount: 110, remainingAmount: 110, maxYieldPerDrill: 55 },
   // East
-  { id: "r3-10", col: 14, row: 7, type: "xenocryst", totalAmount: 100, remainingAmount: 100, maxYieldPerDrill: 50 },
-  { id: "r3-11", col: 13, row: 8, type: "titanium",  totalAmount: 95,  remainingAmount: 95,  maxYieldPerDrill: 45 },
+  { id: "r3-10", col: 14, row: 7, type: "cuprion", totalAmount: 100, remainingAmount: 100, maxYieldPerDrill: 50 },
+  { id: "r3-11", col: 13, row: 8, type: "pythorium",  totalAmount: 95,  remainingAmount: 95,  maxYieldPerDrill: 45 },
   // South
-  { id: "r3-12", col: 4, row: 12, type: "hematite",  totalAmount: 100, remainingAmount: 100, maxYieldPerDrill: 50 },
-  { id: "r3-13", col: 7, row: 12, type: "lithium",   totalAmount: 90,  remainingAmount: 90,  maxYieldPerDrill: 45 },
-  { id: "r3-14", col: 10, row: 12, type: "xenocryst", totalAmount: 110, remainingAmount: 110, maxYieldPerDrill: 55 },
+  { id: "r3-12", col: 4, row: 12, type: "javium",  totalAmount: 100, remainingAmount: 100, maxYieldPerDrill: 50 },
+  { id: "r3-13", col: 7, row: 12, type: "cuprion",   totalAmount: 90,  remainingAmount: 90,  maxYieldPerDrill: 45 },
+  { id: "r3-14", col: 10, row: 12, type: "pythorium", totalAmount: 110, remainingAmount: 110, maxYieldPerDrill: 55 },
   // West
-  { id: "r3-15", col: 1, row: 5, type: "lithium",   totalAmount: 85,  remainingAmount: 85,  maxYieldPerDrill: 40 },
-  { id: "r3-16", col: 1, row: 9, type: "titanium",  totalAmount: 90,  remainingAmount: 90,  maxYieldPerDrill: 45 },
-  { id: "r3-17", col: 3, row: 7, type: "hematite",  totalAmount: 85,  remainingAmount: 85,  maxYieldPerDrill: 40 },
+  { id: "r3-15", col: 1, row: 5, type: "javium",   totalAmount: 85,  remainingAmount: 85,  maxYieldPerDrill: 40 },
+  { id: "r3-16", col: 1, row: 9, type: "cuprion",  totalAmount: 90,  remainingAmount: 90,  maxYieldPerDrill: 45 },
+  { id: "r3-17", col: 3, row: 7, type: "pythorium",  totalAmount: 85,  remainingAmount: 85,  maxYieldPerDrill: 40 },
   // Corners
-  { id: "r3-18", col: 10, row: 11, type: "xenocryst", totalAmount: 120, remainingAmount: 120, maxYieldPerDrill: 60 },
-  { id: "r3-19", col: 3, row: 12, type: "titanium",  totalAmount: 115, remainingAmount: 115, maxYieldPerDrill: 55 },
+  { id: "r3-18", col: 10, row: 11, type: "javium", totalAmount: 120, remainingAmount: 120, maxYieldPerDrill: 60 },
+  { id: "r3-19", col: 3, row: 12, type: "cuprion",  totalAmount: 115, remainingAmount: 115, maxYieldPerDrill: 55 },
 ];
 
-const DEPOSIT_TYPES: MineralType[] = ["lithium", "titanium", "hematite", "xenocryst"];
+const DEPOSIT_TYPES: MineralType[] = ["cuprion", "pythorium", "javium"];
 
 function buildGeneratedDeposits(round: number): RoundDepositConfig[] {
   const config = ROUNDS[round - 1];

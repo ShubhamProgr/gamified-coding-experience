@@ -18,6 +18,7 @@ interface TerminalProps {
   onRunScript?: () => void;
   roverState?: RoverState;
   onShowCode?: () => void;
+  chargingUnlocked?: boolean;
 }
 
 interface CommandOutput {
@@ -50,11 +51,12 @@ function formatTime(ms: number): string {
   });
 }
 
-const HELP_MESSAGE = `CURRENT MISSION — Sector 9×9 Geological Survey
+function getHelpMessage(chargingUnlocked: boolean): string {
+  return `CURRENT MISSION — Sector Geological Survey
 
 Objectives
   1. Start at the central Base Station.
-  2. Drive FRONT and drill to extract Cuprion.
+  2. Drive and drill to extract Cuprion.
   3. Scan nearby tiles for Pythorium deposits.
   4. Explore the sector to find rare Javium.
   5. Fill your cargo hold before the battery runs out.
@@ -63,8 +65,11 @@ Rover SDK
   rover.drive(dir)      Move one tile: FRONT | BACK | LEFT | RIGHT
   rover.drill()         Extract minerals at the current tile
   rover.scan()          Scan the current tile for deposits
-  rover.charge(amt)     Recharge battery (default +10%)
-  rover.turn_left()     Rotate 90° counter-clockwise
+${
+  chargingUnlocked
+    ? "  rover.charge(amt)     Recharge at a Charging Station (default +10%)\n"
+    : ""
+}  rover.turn_left()     Rotate 90° counter-clockwise
   rover.turn_right()    Rotate 90° clockwise
   rover.get_position()  Get current (col, row)
   rover.log(msg)        Print a custom message
@@ -75,6 +80,7 @@ Commands
   /run      Run the editor script
   /status   Print rover telemetry
   /clear    Clear the terminal`;
+}
 
 export default function Terminal({
   logs,
@@ -82,6 +88,7 @@ export default function Terminal({
   onRunScript,
   roverState,
   onShowCode,
+  chargingUnlocked = false,
 }: TerminalProps) {
   const [inputVal, setInputVal] = useState("");
   const [history, setHistory] = useState<string[]>([]);
@@ -128,7 +135,7 @@ export default function Terminal({
         {
           id: `out-${now}-${Math.random()}`,
           type: "output",
-          text: HELP_MESSAGE,
+          text: getHelpMessage(chargingUnlocked),
           timestamp: now,
         },
       ]);
@@ -236,7 +243,7 @@ Target: Collect Cuprion, Pythorium, and Javium. Drill mineral deposits, scan unk
           display: "flex",
           flexDirection: "column",
           overflow: "hidden",
-          background: "#0b0f17",
+          background: "#000000",
           border: "1px solid var(--space-border)",
           borderRadius: "var(--radius-md)",
           boxShadow: "0 8px 24px rgba(0, 0, 0, 0.35)",
@@ -250,7 +257,7 @@ Target: Collect Cuprion, Pythorium, and Javium. Drill mineral deposits, scan unk
             justifyContent: "space-between",
             padding: "7px 12px",
             borderBottom: "1px solid var(--space-border)",
-            background: "#0d121b",
+            background: "#050505",
             flexShrink: 0,
           }}
         >
@@ -387,7 +394,7 @@ Target: Collect Cuprion, Pythorium, and Javium. Drill mineral deposits, scan unk
             gap: 6,
             padding: "9px 12px",
             borderTop: "1px solid var(--space-border)",
-            background: "#0a0e16",
+            background: "#000000",
             flexShrink: 0,
           }}
         >

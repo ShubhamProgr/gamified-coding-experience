@@ -14,6 +14,15 @@ import RoundCompleteModal from "@/components/rounds/RoundCompleteModal";
 import VictoryScreen from "@/components/rounds/VictoryScreen";
 import { useRoundManager } from "@/components/rounds/useRoundManager";
 import { MAX_ROUNDS, ROUNDS } from "@/components/rounds/roundsConfig";
+import BuildPanel from "@/components/buildings/BuildPanel";
+import {
+  BUILDINGS,
+  BUILDINGS_UNLOCK_ROUND,
+  BuildingType,
+  canAfford,
+} from "@/components/buildings/buildingsConfig";
+import { GRID_SIZE, MAP_MASK } from "@/components/Canvas/mapConfig";
+import { getDepositKey } from "@/components/Canvas/minerals";
 
 // Monaco must be loaded client-side only (no SSR)
 const CodeEditor = dynamic(() => import("@/components/IDE/CodeEditor"), {
@@ -29,7 +38,7 @@ const CodeEditor = dynamic(() => import("@/components/IDE/CodeEditor"), {
         fontFamily: "var(--font-ui)",
         fontSize: 13,
         gap: 10,
-        background: "#0d1117",
+        background: "#000000",
       }}
     >
       <div
@@ -85,6 +94,10 @@ export default function Home() {
   // Layout states
   const [activeTab, setActiveTab] = useState<"code" | "console">("code");
 
+  // Building / placement states
+  const [placingBuilding, setPlacingBuilding] = useState<BuildingType | null>(null);
+  const [buildError, setBuildError] = useState<string | null>(null);
+
   // ── Round Manager ────────────────────────────────────────────────────────
   const {
     state: roundState,
@@ -94,10 +107,17 @@ export default function Home() {
     advanceRound,
     dismissModal,
     resetAll,
+    addBuilding,
+    syncInventory,
   } = useRoundManager();
 
   // Compute per-round deposits for the animation hook
   const currentRoundDeposits = getDepositsForRound(roundState.currentRound);
+
+  const chargingUnlocked = roundState.currentRound >= BUILDINGS_UNLOCK_ROUND;
+  const chargingStations = roundState.buildings
+    .filter((b) => b.type === "charging_station")
+    .map((b) => ({ col: b.col, row: b.row }));
 
   const {
     roverState,
@@ -111,12 +131,15 @@ export default function Home() {
     pause,
     reset,
     totalActions,
+    spendInventory,
   } = useRoverAnimation(
     actions,
     currentRoundConfig.radiationZones,
     roundState.persistentBattery,
     roundState.persistentInventory,
-    currentRoundDeposits
+    currentRoundDeposits,
+    chargingStations,
+    chargingUnlocked
   );
 
   // ── Round completion detection ────────────────────────────────────────────
@@ -151,6 +174,7 @@ export default function Home() {
   const handleRun = useCallback(async () => {
     if (isRunning) return;
     setIsRunning(true);
+    setPlacingBuilding(null);
     reset();
     setLogs([]);
 
@@ -201,6 +225,8 @@ export default function Home() {
     let msg = actionToMessage(currentAction);
     if (currentAction.action === "DRILL" && roverState.lastDrillResult) {
       msg = roverState.lastDrillResult.message;
+    } else if (currentAction.action === "CHARGE" && roverState.lastChargeResult) {
+      msg = roverState.lastChargeResult.message;
     } else if (currentAction.action === "SCAN") {
       const depKey = `${roverState.col},${roverState.row}`;
       const dep = roverState.deposits[depKey];
@@ -218,7 +244,7 @@ export default function Home() {
         raw: currentAction,
       });
     });
-  }, [currentAction, appendLog, roverState.lastDrillResult, roverState.deposits, roverState.col, roverState.row]);
+  }, [currentAction, appendLog, roverState.lastDrillResult, roverState.lastChargeResult, roverState.deposits, roverState.col, roverState.row]);
 
   // ── Keyboard shortcut: Ctrl+Enter to run ─────────────────────────────────
   useEffect(() => {
@@ -238,8 +264,17 @@ export default function Home() {
     setActions([]);
     setLogs([]);
     reset();
+    setPlacingBuilding(null);
+    setBuildError(null);
     finishedReportedRef.current = false;
-  }, [advanceRound, reset]);
+    if (roundState.currentRound + 1 === BUILDINGS_UNLOCK_ROUND) {
+      appendLog({
+        type: "system",
+        message:
+          "🏗 New building unlocked: Charging Station. Open Build to place one on the map.",
+      });
+    }
+  }, [advanceRound, reset, appendLog, roundState.currentRound]);
 
   // ── Handle full restart ───────────────────────────────────────────────────
   const handleRestart = useCallback(() => {
@@ -247,8 +282,103 @@ export default function Home() {
     setActions([]);
     setLogs([]);
     reset();
+    setPlacingBuilding(null);
+    setBuildError(null);
     finishedReportedRef.current = false;
   }, [resetAll, reset]);
+
+  // ── Building placement ────────────────────────────────────────────────────
+  const handleStartPlacement = useCallback(
+    (type: BuildingType) => {
+      if (!chargingUnlocked) return;
+      setBuildError(null);
+      setPlacingBuilding(type);
+    },
+    [chargingUnlocked]
+  );
+
+  const handleCancelPlacement = useCallback(() => {
+    setPlacingBuilding(null);
+    setBuildError(null);
+  }, []);
+
+  useEffect(() => {
+    if (!placingBuilding) return;
+    const handler = (e: KeyboardEvent) => {
+      if (e.key === "Escape") handleCancelPlacement();
+    };
+    window.addEventListener("keydown", handler);
+    return () => window.removeEventListener("keydown", handler);
+  }, [placingBuilding, handleCancelPlacement]);
+
+  const handlePlaceBuilding = useCallback(
+    (col: number, row: number) => {
+      if (!placingBuilding || !chargingUnlocked) return;
+      const def = BUILDINGS[placingBuilding];
+
+      if (
+        col < 0 ||
+        col >= GRID_SIZE ||
+        row < 0 ||
+        row >= GRID_SIZE ||
+        MAP_MASK[row][col] === 0
+      ) {
+        setBuildError("Choose a walkable terrain tile.");
+        return;
+      }
+      if (col === 7 && row === 7) {
+        setBuildError("The landing pad is reserved.");
+        return;
+      }
+      if (col === roverState.col && row === roverState.row) {
+        setBuildError("Move the rover off this tile first.");
+        return;
+      }
+      if (roundState.buildings.some((b) => b.col === col && b.row === row)) {
+        setBuildError("A building already occupies this tile.");
+        return;
+      }
+      const deposit = roverState.deposits[getDepositKey(col, row)];
+      if (deposit && !deposit.depleted) {
+        setBuildError("Can't build on an active mineral deposit.");
+        return;
+      }
+      if (!canAfford(roverState.inventory, def.cost)) {
+        setBuildError("Not enough minerals to build a Charging Station.");
+        return;
+      }
+
+      const nextInventory = spendInventory(def.cost);
+      if (!nextInventory) {
+        setBuildError("Not enough minerals to build a Charging Station.");
+        return;
+      }
+
+      addBuilding({
+        id: `${placingBuilding}-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`,
+        type: placingBuilding,
+        col,
+        row,
+      });
+      syncInventory(nextInventory);
+      appendLog({
+        type: "system",
+        message: `🏗 Charging Station deployed at (${col}, ${row}).`,
+      });
+      setPlacingBuilding(null);
+      setBuildError(null);
+    },
+    [
+      placingBuilding,
+      chargingUnlocked,
+      roverState,
+      roundState.buildings,
+      spendInventory,
+      addBuilding,
+      syncInventory,
+      appendLog,
+    ]
+  );
 
   return (
     <div
@@ -264,14 +394,12 @@ export default function Home() {
       <Toolbar
         isPlaying={isPlaying}
         isFinished={isFinished}
-        isRunning={isRunning}
         hasActions={actions.length > 0}
         speed={speed}
         onSpeedChange={setSpeed}
         onPlay={play}
         onPause={pause}
         onReset={reset}
-        onRun={handleRun}
         language={language}
         onLanguageChange={handleLanguageChange}
         totalActions={totalActions}
@@ -282,7 +410,6 @@ export default function Home() {
       <RoundBanner
         roundConfig={currentRoundConfig}
         cumulativeMinerals={roundState.cumulativeMinerals + roverState.minerals}
-        currentRoundMinerals={roverState.minerals}
         starsEarned={roundState.starsEarned}
         battery={roverState.battery}
       />
@@ -297,7 +424,7 @@ export default function Home() {
             top: 0,
             left: 0,
             zIndex: 10,
-            width: "clamp(420px, 44vw, 760px)",
+            width: "clamp(360px, 38vw, 620px)",
             height: "100%",
             display: "flex",
             flexDirection: "column",
@@ -321,7 +448,7 @@ export default function Home() {
                   display: "flex",
                   flexDirection: "column",
                   overflow: "hidden",
-                  background: "#0b0f17",
+                  background: "#000000",
                   border: "1px solid var(--space-border)",
                   borderRadius: "var(--radius-md)",
                   boxShadow: "0 8px 24px rgba(0, 0, 0, 0.35)",
@@ -335,7 +462,7 @@ export default function Home() {
                     justifyContent: "space-between",
                     padding: "7px 12px",
                     borderBottom: "1px solid var(--space-border)",
-                    background: "#0d121b",
+                    background: "#050505",
                     flexShrink: 0,
                   }}
                 >
@@ -355,42 +482,94 @@ export default function Home() {
                     </span>
                   </div>
 
-                  <button
-                    type="button"
-                    onClick={() => setActiveTab("console")}
-                    style={{
-                      display: "flex",
-                      alignItems: "center",
-                      gap: 4,
-                      background: "transparent",
-                      border: "none",
-                      color: "var(--text-muted)",
-                      fontFamily: "var(--font-code)",
-                      fontSize: 10.5,
-                      cursor: "pointer",
-                      padding: "2px 6px",
-                      borderRadius: "var(--radius-sm)",
-                      transition: "color 0.15s",
-                    }}
-                    onMouseEnter={(e) => ((e.target as HTMLElement).style.color = "var(--text-primary)")}
-                    onMouseLeave={(e) => ((e.target as HTMLElement).style.color = "var(--text-muted)")}
-                  >
-                    <span>&gt;_</span>
-                    <span>Terminal</span>
-                    {logs.length > 0 && (
-                      <span
-                        style={{
-                          fontSize: 9,
-                          padding: "1px 5px",
-                          borderRadius: 8,
-                          background: "rgba(0,212,255,0.2)",
-                          color: "var(--glow-cyan)",
-                        }}
-                      >
-                        {logs.length}
-                      </span>
-                    )}
-                  </button>
+                  <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+                    <button
+                      type="button"
+                      onClick={handleRun}
+                      disabled={isRunning}
+                      title="Run code (Ctrl+Enter)"
+                      style={{
+                        display: "flex",
+                        alignItems: "center",
+                        gap: 5,
+                        background: "rgba(0,212,255,0.1)",
+                        border: "1px solid rgba(0,212,255,0.3)",
+                        color: isRunning ? "var(--text-muted)" : "var(--glow-cyan)",
+                        fontFamily: "var(--font-code)",
+                        fontSize: 10.5,
+                        fontWeight: 600,
+                        cursor: isRunning ? "default" : "pointer",
+                        padding: "3px 10px",
+                        borderRadius: "var(--radius-sm)",
+                        transition: "background 0.15s, border-color 0.15s",
+                        opacity: isRunning ? 0.7 : 1,
+                      }}
+                      onMouseEnter={(e) => {
+                        if (isRunning) return;
+                        (e.currentTarget as HTMLElement).style.background = "rgba(0,212,255,0.18)";
+                        (e.currentTarget as HTMLElement).style.borderColor = "rgba(0,212,255,0.5)";
+                      }}
+                      onMouseLeave={(e) => {
+                        (e.currentTarget as HTMLElement).style.background = "rgba(0,212,255,0.1)";
+                        (e.currentTarget as HTMLElement).style.borderColor = "rgba(0,212,255,0.3)";
+                      }}
+                    >
+                      {isRunning ? (
+                        <>
+                          <span
+                            style={{
+                              width: 9,
+                              height: 9,
+                              border: "1.5px solid rgba(0,212,255,0.3)",
+                              borderTopColor: "var(--glow-cyan)",
+                              borderRadius: "50%",
+                              animation: "spin 0.8s linear infinite",
+                            }}
+                          />
+                          Running
+                        </>
+                      ) : (
+                        <>▶ Run</>
+                      )}
+                    </button>
+
+                    <button
+                      type="button"
+                      onClick={() => setActiveTab("console")}
+                      style={{
+                        display: "flex",
+                        alignItems: "center",
+                        gap: 4,
+                        background: "transparent",
+                        border: "none",
+                        color: "var(--text-muted)",
+                        fontFamily: "var(--font-code)",
+                        fontSize: 10.5,
+                        cursor: "pointer",
+                        padding: "2px 6px",
+                        borderRadius: "var(--radius-sm)",
+                        transition: "color 0.15s",
+                      }}
+                      onMouseEnter={(e) => ((e.target as HTMLElement).style.color = "var(--text-primary)")}
+                      onMouseLeave={(e) => ((e.target as HTMLElement).style.color = "var(--text-muted)")}
+                    >
+                      <span>&gt;_</span>
+                      <span>Terminal</span>
+                      {logs.length > 0 && (
+                        <span
+                          style={{
+                            fontSize: 9,
+                            padding: "1px 5px",
+                            borderRadius: 8,
+                            background: "rgba(0,212,255,0.2)",
+                            color: "var(--glow-cyan)",
+                          }}
+                        >
+                          {logs.length}
+                        </span>
+                      )}
+                    </button>
+                  </div>
                 </div>
 
                 {/* Window Content */}
@@ -400,6 +579,7 @@ export default function Home() {
                     onChange={setCode}
                     language={language}
                     readOnly={isRunning}
+                    chargingUnlocked={chargingUnlocked}
                   />
                 </div>
               </div>
@@ -411,6 +591,7 @@ export default function Home() {
                 onRunScript={handleRun}
                 roverState={roverState}
                 onShowCode={() => setActiveTab("code")}
+                chargingUnlocked={chargingUnlocked}
               />
             )}
           </div>
@@ -426,7 +607,25 @@ export default function Home() {
             progress={progress}
             currentAction={currentAction}
             radiationZones={currentRoundConfig.radiationZones}
+            buildings={roundState.buildings}
+            placingBuilding={placingBuilding !== null}
+            onPlaceBuilding={handlePlaceBuilding}
           />
+
+          {chargingUnlocked && (
+            <div style={{ position: "absolute", right: 12, bottom: 46, zIndex: 20 }}>
+              <BuildPanel
+                round={roundState.currentRound}
+                inventory={roverState.inventory}
+                buildings={roundState.buildings}
+                placing={placingBuilding}
+                error={buildError}
+                busy={isPlaying || isRunning}
+                onStartPlacement={handleStartPlacement}
+                onCancelPlacement={handleCancelPlacement}
+              />
+            </div>
+          )}
         </div>
       </div>
 

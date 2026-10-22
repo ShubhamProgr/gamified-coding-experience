@@ -54,6 +54,7 @@ export interface RoverState {
   cargoCapacity: number;
   inventory: RoverInventory;
   lastDrillResult: DrillResult | null;
+  lastChargeResult: { success: boolean; message: string } | null;
   deposits: Record<string, MineralDeposit>;
   drilledHoles: Array<{ col: number; row: number; count: number }>;
 }
@@ -95,6 +96,7 @@ const BASE_STATE: Omit<RoverState, "deposits"> = {
     javium: 0,
   },
   lastDrillResult: null,
+  lastChargeResult: null,
   drilledHoles: [],
 };
 
@@ -134,7 +136,9 @@ export function useRoverAnimation(
   radiationZones: RadiationZone[] = [],
   initialBattery = 100,
   initialInventory?: RoverInventory,
-  customDeposits?: Parameters<typeof createInitialDepositsMap>[0]
+  customDeposits?: Parameters<typeof createInitialDepositsMap>[0],
+  chargingStations: Array<{ col: number; row: number }> = [],
+  chargingUnlocked = false
 ) {
   const [state, setState] = useState<RoverState>(() => ({
     ...makeInitialState(customDeposits),
@@ -334,12 +338,49 @@ export function useRoverAnimation(
           isDrilling: false,
         };
 
-      case "CHARGE":
+      case "CHARGE": {
+        const amount = action.amount ?? 10;
+        if (!chargingUnlocked) {
+          return {
+            ...prev,
+            isDrilling: false,
+            lastChargeResult: {
+              success: false,
+              message:
+                "Charging is offline until Round 5 — build a Charging Station to enable it.",
+            },
+          };
+        }
+
+        const inRange = chargingStations.some(
+          (station) =>
+            Math.abs(station.col - prev.col) + Math.abs(station.row - prev.row) <= 1
+        );
+
+        if (!inRange) {
+          return {
+            ...prev,
+            isDrilling: false,
+            lastChargeResult: {
+              success: false,
+              message:
+                "No Charging Station in range — move onto or next to a station.",
+            },
+          };
+        }
+
+        const gained = Math.min(amount, Math.max(0, 100 - prev.battery));
+        const nextBattery = clamp(prev.battery + amount, 0, 100);
         return {
           ...prev,
-          battery: clamp(prev.battery + (action.amount ?? 20), 0, 100),
+          battery: nextBattery,
           isDrilling: false,
+          lastChargeResult: {
+            success: true,
+            message: `Charging Station engaged: +${gained}% battery (${nextBattery}%).`,
+          },
         };
+      }
 
       case "TURN": {
         const dir = action.turn ?? "LEFT";
@@ -354,7 +395,7 @@ export function useRoverAnimation(
       default:
         return { ...prev, battery: clamp(prev.battery - (BATTERY_COSTS[action.action] ?? 0), 0, 100), isDrilling: false };
     }
-  }, [radiationZones]);
+  }, [radiationZones, chargingStations, chargingUnlocked]);
 
   // Animation loop using requestAnimationFrame
   const tick = useCallback((timestamp: number) => {
@@ -433,6 +474,39 @@ export function useRoverAnimation(
     stateRef.current = fresh;
   }, [pause, customDeposits, initialBattery, initialInventory]);
 
+  const spendInventory = useCallback(
+    (cost: Partial<RoverInventory>): RoverInventory | null => {
+      const cur = stateRef.current;
+      const cuprion = cost.cuprion ?? 0;
+      const pythorium = cost.pythorium ?? 0;
+      const javium = cost.javium ?? 0;
+
+      if (
+        cur.inventory.cuprion < cuprion ||
+        cur.inventory.pythorium < pythorium ||
+        cur.inventory.javium < javium
+      ) {
+        return null;
+      }
+
+      const nextInventory: RoverInventory = {
+        cuprion: cur.inventory.cuprion - cuprion,
+        pythorium: cur.inventory.pythorium - pythorium,
+        javium: cur.inventory.javium - javium,
+      };
+      const spent = cuprion + pythorium + javium;
+      const next: RoverState = {
+        ...cur,
+        inventory: nextInventory,
+        minerals: Math.max(0, cur.minerals - spent),
+      };
+      stateRef.current = next;
+      setState(next);
+      return nextInventory;
+    },
+    []
+  );
+
   // Auto-play when new actions arrive
   useEffect(() => {
     queueMicrotask(() => reset());
@@ -457,6 +531,7 @@ export function useRoverAnimation(
     play,
     pause,
     reset,
+    spendInventory,
     totalActions: actions.length,
   } as const;
 }

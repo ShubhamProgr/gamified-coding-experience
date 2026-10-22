@@ -58,7 +58,11 @@ class Rover:
         return {}  # Frontend resolves the real value during animation
 
     def charge(self, amount: int = 10) -> None:
-        """Recharge the rover's battery by `amount` units (requires solar panel tile)."""
+        """Recharge the rover's battery by `amount` units.
+
+        Requires a deployed Charging Station on or adjacent to the rover.
+        Charging unlocks in Round 5.
+        """
         _emit({"action": "CHARGE", "amount": int(amount)})
 
     def get_position(self) -> dict:

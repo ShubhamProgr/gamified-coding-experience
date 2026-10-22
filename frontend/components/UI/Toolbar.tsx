@@ -3,14 +3,12 @@
 interface ToolbarProps {
   isPlaying: boolean;
   isFinished: boolean;
-  isRunning: boolean;
   hasActions: boolean;
   speed: number;
   onSpeedChange: (speed: number) => void;
   onPlay: () => void;
   onPause: () => void;
   onReset: () => void;
-  onRun: () => void;
   language: string;
   onLanguageChange?: (lang: string) => void;
   totalActions: number;
@@ -27,14 +25,12 @@ const SPEED_STEPS = [
 export default function Toolbar({
   isPlaying,
   isFinished,
-  isRunning,
   hasActions,
   speed,
   onSpeedChange,
   onPlay,
   onPause,
   onReset,
-  onRun,
   language,
   onLanguageChange,
   totalActions,
@@ -84,35 +80,6 @@ export default function Toolbar({
       </div>
 
       <div style={{ width: 1, background: "var(--space-border)", alignSelf: "stretch", margin: "12px 0" }} />
-
-      {/* Run button */}
-      <button
-        type="button"
-        id="btn-run"
-        className="btn btn--primary"
-        onClick={onRun}
-        disabled={isRunning}
-        title="Execute code (Ctrl+Enter)"
-        style={{ minWidth: 90 }}
-      >
-        {isRunning ? (
-          <>
-            <div
-              style={{
-                width: 12,
-                height: 12,
-                border: "2px solid rgba(255,255,255,0.3)",
-                borderTopColor: "#fff",
-                borderRadius: "50%",
-                animation: "spin 0.8s linear infinite",
-              }}
-            />
-            Running
-          </>
-        ) : (
-          <>▶ Run</>
-        )}
-      </button>
 
       {/* Playback controls */}
       <div style={{ display: "flex", alignItems: "center", gap: 4 }}>
@@ -208,80 +175,28 @@ export default function Toolbar({
       {/* Spacer */}
       <div style={{ flex: 1 }} />
 
-      {/* 9x9 Sector indicator */}
-      <div
-        style={{
-          display: "flex",
-          alignItems: "center",
-          gap: 5,
-          padding: "3px 8px",
-          borderRadius: "var(--radius-sm)",
-          background: "rgba(232,99,26,0.12)",
-          border: "1px solid rgba(232,99,26,0.3)",
-          fontSize: 11,
-          color: "var(--mars-orange)",
-          fontWeight: 600,
-          fontFamily: "var(--font-code)",
-        }}
-      >
-        <span>🗺 9×9 Sector</span>
-      </div>
-
-
       {/* Language selector */}
-      <div
+      <select
+        value={language}
+        onChange={(e) => onLanguageChange?.(e.target.value)}
+        aria-label="Language"
         style={{
-          display: "flex",
-          alignItems: "center",
-          gap: 6,
-          padding: "4px 8px",
-          borderRadius: "var(--radius-md)",
+          fontSize: 11,
+          fontWeight: 600,
+          color: "var(--glow-cyan)",
+          fontFamily: "var(--font-ui)",
           background: "rgba(0,212,255,0.08)",
           border: "1px solid rgba(0,212,255,0.2)",
+          borderRadius: "var(--radius-md)",
+          outline: "none",
+          cursor: "pointer",
+          padding: "5px 8px",
         }}
       >
-        {language !== "python" && (
-          <span style={{ fontSize: 12 }}>
-            {language === "cpp" ? "⚙️" : "☕"}
-          </span>
-        )}
-        <select
-          value={language}
-          onChange={(e) => onLanguageChange?.(e.target.value)}
-          style={{
-            fontSize: 11,
-            fontWeight: 600,
-            color: "var(--glow-cyan)",
-            fontFamily: "var(--font-ui)",
-            background: "transparent",
-            border: "none",
-            outline: "none",
-            cursor: "pointer",
-            paddingRight: 4,
-          }}
-        >
-          <option value="python" style={{ background: "#111827" }}>Python</option>
-          <option value="java" style={{ background: "#111827" }}>Java</option>
-          <option value="cpp" style={{ background: "#111827" }}>C++</option>
-        </select>
-      </div>
-
-      {/* Status dot */}
-      <div style={{ display: "flex", alignItems: "center", gap: 5 }}>
-        <div
-          style={{
-            width: 7,
-            height: 7,
-            borderRadius: "50%",
-            background: isRunning ? "var(--glow-amber)" : isFinished ? "var(--glow-green)" : "var(--text-muted)",
-            boxShadow: isRunning ? "0 0 8px var(--glow-amber)" : isFinished ? "0 0 8px var(--glow-green)" : "none",
-            animation: isRunning ? "pulse-glow 1s ease-in-out infinite" : "none",
-          }}
-        />
-        <span style={{ fontSize: 10, color: "var(--text-muted)", fontFamily: "var(--font-ui)" }}>
-          {isRunning ? "Compiling" : isFinished ? "Done" : hasActions ? "Ready" : "Idle"}
-        </span>
-      </div>
+        <option value="python" style={{ background: "#111827" }}>Python</option>
+        <option value="java" style={{ background: "#111827" }}>Java</option>
+        <option value="cpp" style={{ background: "#111827" }}>C++</option>
+      </select>
     </header>
   );
 }

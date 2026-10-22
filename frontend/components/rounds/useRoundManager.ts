@@ -10,6 +10,7 @@ import {
   RoundDepositConfig,
 } from "./roundsConfig";
 import type { RoverInventory } from "../Canvas/useRoverAnimation";
+import type { Building } from "../buildings/buildingsConfig";
 
 // ── Types ─────────────────────────────────────────────────────────────────
 
@@ -22,6 +23,7 @@ export interface RoundManagerState {
   cumulativeMinerals: number;
   persistentBattery: number;
   persistentInventory: RoverInventory;
+  buildings: Building[];
   showCompleteModal: boolean;
   showVictoryScreen: boolean;
 }
@@ -34,6 +36,8 @@ export interface RoundManagerAPI {
   advanceRound: () => void;
   dismissModal: () => void;
   resetAll: () => void;
+  addBuilding: (building: Building) => void;
+  syncInventory: (inventory: RoverInventory) => void;
 }
 
 // ── Hook ──────────────────────────────────────────────────────────────────
@@ -51,6 +55,7 @@ const INITIAL_STATE: RoundManagerState = {
   cumulativeMinerals: 0,
   persistentBattery: 100,
   persistentInventory: { ...EMPTY_INVENTORY },
+  buildings: [],
   showCompleteModal: false,
   showVictoryScreen: false,
 };
@@ -123,7 +128,24 @@ export function useRoundManager(): RoundManagerAPI {
       ...INITIAL_STATE,
       starsEarned: Array.from({ length: MAX_ROUNDS }, () => 0),
       persistentInventory: { ...EMPTY_INVENTORY },
+      buildings: [],
     });
+  }, []);
+
+  /** Persist a newly placed building across rounds. */
+  const addBuilding = useCallback((building: Building) => {
+    setState((prev) => ({
+      ...prev,
+      buildings: [...prev.buildings, building],
+    }));
+  }, []);
+
+  /** Keep the carried inventory in sync after spending minerals. */
+  const syncInventory = useCallback((inventory: RoverInventory) => {
+    setState((prev) => ({
+      ...prev,
+      persistentInventory: { ...inventory },
+    }));
   }, []);
 
   return {
@@ -134,5 +156,7 @@ export function useRoundManager(): RoundManagerAPI {
     advanceRound,
     dismissModal,
     resetAll,
+    addBuilding,
+    syncInventory,
   };
 }

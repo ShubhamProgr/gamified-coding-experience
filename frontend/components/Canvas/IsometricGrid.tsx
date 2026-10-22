@@ -11,6 +11,8 @@ import {
 import type { RadiationZone } from "../rounds/roundsConfig";
 import { GRID_SIZE, MAP_MASK } from "./mapConfig";
 import RoverModel from "./RoverModel";
+import { drawChargingStation } from "./drawChargingStation";
+import type { Building } from "../buildings/buildingsConfig";
 
 // ── Tile dimensions ────────────────────────────────────────────────────────
 export const TILE_W = 104;
@@ -21,7 +23,15 @@ const DEFAULT_ZOOM = 1.15;
 const ZOOM_STEP = 0.15;
 
 // ── Tile types ─────────────────────────────────────────────────────────────
-type TileType = "sand" | "rock" | "darkrock" | "mineral" | "start" | "void";
+type TileType =
+  | "sand"
+  | "dune"
+  | "rock"
+  | "darkrock"
+  | "ridge"
+  | "mineral"
+  | "start"
+  | "void";
 
 interface Tile {
   type: TileType;
@@ -39,6 +49,13 @@ function seededRand(seed: number) {
   };
 }
 
+// Hand-placed landmarks that break up the terrain and give the sector
+// a handcrafted, game-like feel. Applied only on walkable tiles; mineral
+// deposits placed afterwards take precedence.
+const RIDGE_CELLS: Array<[number, number]> = [
+  [2, 2], [2, 4], [11, 4], [13, 7], [5, 13], [6, 14], [10, 13],
+];
+
 function generateMap(): Tile[][] {
   const rand = seededRand(42);
   const map: Tile[][] = [];
@@ -55,8 +72,9 @@ function generateMap(): Tile[][] {
 
       const v = rand();
       let type: TileType = "sand";
-      if (v > 0.85) type = "darkrock";
-      else if (v > 0.65) type = "rock";
+      if (v > 0.9) type = "darkrock";
+      else if (v > 0.72) type = "rock";
+      else if (v > 0.55) type = "dune";
 
       if (r === startRow && c === startCol) type = "start";
 
@@ -69,6 +87,12 @@ function generateMap(): Tile[][] {
     }
   }
 
+  for (const [col, row] of RIDGE_CELLS) {
+    if (MAP_MASK[row]?.[col] === 1 && map[row][col].type !== "start") {
+      map[row][col].type = "ridge";
+      map[row][col].elevation = 2;
+    }
+  }
   for (const dep of INITIAL_DEPOSIT_CONFIGS) {
     if (dep.row >= 0 && dep.row < GRID_SIZE && dep.col >= 0 && dep.col < GRID_SIZE) {
       if (map[dep.row][dep.col].type !== "void") {
@@ -82,15 +106,35 @@ function generateMap(): Tile[][] {
 
 const MAP = generateMap();
 
+// Isometric painter's order: back-to-front by (col + row).
+const DRAW_ORDER: Array<{ col: number; row: number }> = [];
+for (let r = 0; r < GRID_SIZE; r++) {
+  for (let c = 0; c < GRID_SIZE; c++) {
+    DRAW_ORDER.push({ col: c, row: r });
+  }
+}
+DRAW_ORDER.sort((a, b) => a.col + a.row - (b.col + b.row) || a.row - b.row);
+
 // ── Color palettes — refined warm Mars tones ───────────────────────────────
 const TILE_COLORS: Record<TileType, { top: string; left: string; right: string }> = {
   sand:     { top: "#bf8e64", left: "#9a7050", right: "#855d3e" },
+  dune:     { top: "#cda079", left: "#a67b58", right: "#8f6746" },
   rock:     { top: "#8a6850", left: "#6e5038", right: "#5e4028" },
   darkrock: { top: "#4a2e1e", left: "#321c0e", right: "#241206" },
+  ridge:    { top: "#a0785a", left: "#7c5840", right: "#62422e" },
   mineral:  { top: "#2e4a40", left: "#1e3530", right: "#142420" },
   start:    { top: "#bf8e64", left: "#9a7050", right: "#855d3e" },
   void:     { top: "transparent", left: "transparent", right: "transparent" },
 };
+
+// Darken a hex colour by a 0..1 amount.
+function darken(hex: string, amount: number): string {
+  const n = parseInt(hex.slice(1), 16);
+  const r = Math.max(0, Math.round(((n >> 16) & 0xff) * (1 - amount)));
+  const g = Math.max(0, Math.round(((n >> 8) & 0xff) * (1 - amount)));
+  const b = Math.max(0, Math.round((n & 0xff) * (1 - amount)));
+  return `rgb(${r},${g},${b})`;
+}
 
 // ── Coordinate transforms ──────────────────────────────────────────────────
 function isoToScreen(
@@ -214,6 +258,50 @@ function drawCrystalCluster(
   ctx.restore();
 }
 
+// ── Objective beacon — floating marker above active deposits ───────────────
+function drawObjectiveBeacon(
+  ctx: CanvasRenderingContext2D,
+  cx: number,
+  cy: number,
+  deposit: MineralDeposit,
+  time: number
+) {
+  if (deposit.depleted || deposit.remainingAmount <= 0) return;
+
+  const meta = MINERAL_METAS[deposit.type];
+  const bob = Math.sin(time * 0.003 + deposit.col * 1.7 + deposit.row) * 3;
+  const topY = cy - 34 + bob;
+
+  ctx.save();
+
+  // Light beam
+  const beam = ctx.createLinearGradient(cx, cy - 6, cx, topY);
+  beam.addColorStop(0, meta.color + "00");
+  beam.addColorStop(0.7, meta.color + "22");
+  beam.addColorStop(1, meta.color + "66");
+  ctx.fillStyle = beam;
+  ctx.beginPath();
+  ctx.moveTo(cx - 2, cy - 6);
+  ctx.lineTo(cx + 2, cy - 6);
+  ctx.lineTo(cx + 1, topY);
+  ctx.lineTo(cx - 1, topY);
+  ctx.closePath();
+  ctx.fill();
+
+  // Floating diamond
+  ctx.translate(cx, topY);
+  ctx.rotate(Math.PI / 4);
+  ctx.shadowBlur = 10;
+  ctx.shadowColor = meta.glowColor;
+  ctx.fillStyle = meta.color;
+  ctx.fillRect(-3.5, -3.5, 7, 7);
+  ctx.shadowBlur = 0;
+  ctx.fillStyle = "rgba(255,255,255,0.85)";
+  ctx.fillRect(-1.5, -1.5, 3, 3);
+
+  ctx.restore();
+}
+
 // ── Radiation zone ─────────────────────────────────────────────────────────
 function drawRadiationZone(
   ctx: CanvasRenderingContext2D,
@@ -304,7 +392,9 @@ function drawTile(
   const { top, left, right } = TILE_COLORS[tile.type];
   const hw = TILE_W / 2;
   const hh = TILE_H / 2;
-  const depth = 8 + tile.elevation * 2;
+  // Edge tiles are given a taller cliff face so the landmass reads as a
+  // raised island over the abyss rather than a flat cut-out.
+  const depth = (isEdgeTile ? 40 : 32) + tile.elevation * 4;
 
   // Top face
   ctx.beginPath();
@@ -366,7 +456,10 @@ function drawTile(
   ctx.lineTo(sx + hw, sy + hh + depth);
   ctx.lineTo(sx + hw, sy + hh);
   ctx.closePath();
-  ctx.fillStyle = left;
+  const leftGrad = ctx.createLinearGradient(sx, sy, sx, sy + hh + depth);
+  leftGrad.addColorStop(0, left);
+  leftGrad.addColorStop(1, darken(left, 0.35));
+  ctx.fillStyle = leftGrad;
   ctx.fill();
 
   // Right face
@@ -376,11 +469,53 @@ function drawTile(
   ctx.lineTo(sx + TILE_W, sy + depth);
   ctx.lineTo(sx + TILE_W, sy);
   ctx.closePath();
-  ctx.fillStyle = right;
+  const rightGrad = ctx.createLinearGradient(sx + hw, sy, sx + TILE_W, sy + depth);
+  rightGrad.addColorStop(0, right);
+  rightGrad.addColorStop(1, darken(right, 0.45));
+  ctx.fillStyle = rightGrad;
   ctx.fill();
+
+  // Warm rim light along the outer cliff edge
+  if (isEdgeTile) {
+    ctx.save();
+    ctx.strokeStyle = "rgba(255,170,90,0.35)";
+    ctx.lineWidth = 0.8;
+    ctx.beginPath();
+    ctx.moveTo(sx, sy + depth);
+    ctx.lineTo(sx + hw, sy + hh + depth);
+    ctx.lineTo(sx + TILE_W, sy + depth);
+    ctx.stroke();
+    ctx.restore();
+  }
 
   const cx = sx + hw;
   const cy = sy;
+
+  // ── Terrain detail ──────────────────────────────────────────────────────
+  if (tile.type === "dune") {
+    ctx.save();
+    ctx.strokeStyle = "rgba(90,60,35,0.22)";
+    ctx.lineWidth = 0.7;
+    for (let i = 0; i < 3; i++) {
+      ctx.beginPath();
+      ctx.ellipse(cx + (i - 1) * 7, cy + 2 - i * 2, 13 - i * 2, 3, 0, Math.PI * 0.15, Math.PI * 0.85);
+      ctx.stroke();
+    }
+    ctx.restore();
+  }
+
+  if (tile.type === "ridge") {
+    ctx.save();
+    ctx.strokeStyle = "rgba(255,220,180,0.28)";
+    ctx.lineWidth = 1;
+    ctx.beginPath();
+    ctx.moveTo(cx - 22, cy - 4);
+    ctx.lineTo(cx - 6, cy - 12);
+    ctx.lineTo(cx + 10, cy - 5);
+    ctx.lineTo(cx + 24, cy - 11);
+    ctx.stroke();
+    ctx.restore();
+  }
 
   // Micro-cracks
   if (tile.crackCount > 0 && tile.type !== "mineral") {
@@ -402,22 +537,58 @@ function drawTile(
 
   if (deposit) {
     drawCrystalCluster(ctx, cx, cy, deposit, time);
+    drawObjectiveBeacon(ctx, cx, cy, deposit, time);
   }
 
-  // Start tile marker
+  // Start tile — landing pad with rotating beacon ring
   const isStartSite = tile.type === "start" || (col === 7 && row === 7);
   if (isStartSite) {
     ctx.save();
+    ctx.translate(cx, cy);
+
+    // Outer pad glow
+    const padGlow = ctx.createRadialGradient(0, 0, 2, 0, 0, 20);
+    padGlow.addColorStop(0, "rgba(0,212,255,0.22)");
+    padGlow.addColorStop(1, "transparent");
+    ctx.fillStyle = padGlow;
     ctx.beginPath();
-    ctx.ellipse(cx, cy, 13, 6.5, 0, 0, Math.PI * 2);
+    ctx.ellipse(0, 0, 20, 10, 0, 0, Math.PI * 2);
+    ctx.fill();
+
+    // Concentric pad rings
     ctx.strokeStyle = "rgba(0,212,255,0.55)";
     ctx.lineWidth = 1.2;
-    ctx.setLineDash([4, 3]);
+    ctx.beginPath();
+    ctx.ellipse(0, 0, 14, 7, 0, 0, Math.PI * 2);
     ctx.stroke();
 
+    ctx.strokeStyle = "rgba(0,212,255,0.3)";
+    ctx.lineWidth = 0.8;
     ctx.beginPath();
-    ctx.arc(cx, cy, 2.2, 0, Math.PI * 2);
-    ctx.fillStyle = "rgba(0,212,255,0.8)";
+    ctx.ellipse(0, 0, 9, 4.5, 0, 0, Math.PI * 2);
+    ctx.stroke();
+
+    // Rotating sweep arc
+    const sweep = time * 0.0015;
+    ctx.strokeStyle = "rgba(0,212,255,0.8)";
+    ctx.lineWidth = 1.6;
+    ctx.beginPath();
+    ctx.ellipse(0, 0, 14, 7, 0, sweep, sweep + Math.PI * 0.35);
+    ctx.stroke();
+
+    // Corner lights
+    const lightPulse = 0.55 + 0.45 * Math.sin(time * 0.005);
+    ctx.fillStyle = `rgba(0,212,255,${lightPulse})`;
+    [[-14, 0], [14, 0], [0, -7], [0, 7]].forEach(([lx, ly]) => {
+      ctx.beginPath();
+      ctx.arc(lx, ly, 1.3, 0, Math.PI * 2);
+      ctx.fill();
+    });
+
+    // Center marker
+    ctx.fillStyle = "rgba(0,212,255,0.9)";
+    ctx.beginPath();
+    ctx.arc(0, 0, 2.2, 0, Math.PI * 2);
     ctx.fill();
     ctx.restore();
   }
@@ -443,6 +614,9 @@ interface IsometricGridProps {
   progress: number;
   currentAction: RoverAction | null;
   radiationZones?: RadiationZone[];
+  buildings?: Building[];
+  placingBuilding?: boolean;
+  onPlaceBuilding?: (col: number, row: number) => void;
 }
 
 export default function IsometricGrid({
@@ -451,6 +625,9 @@ export default function IsometricGrid({
   progress,
   currentAction,
   radiationZones = [],
+  buildings = [],
+  placingBuilding = false,
+  onPlaceBuilding,
 }: IsometricGridProps) {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const containerRef = useRef<HTMLDivElement>(null);
@@ -468,6 +645,51 @@ export default function IsometricGrid({
   const [isDragging, setIsDragging] = useState(false);
   const [containerSize, setContainerSize] = useState({ width: 0, height: 0 });
   const dragStartRef = useRef({ x: 0, y: 0, panX: 0, panY: 0 });
+  const pointerDownRef = useRef<{ x: number; y: number } | null>(null);
+  const tilePosRef = useRef<Record<string, { sx: number; sy: number }>>({});
+  const transformRef = useRef({ w: 0, h: 0, scale: 1, panX: 0, panY: 0 });
+  const hoverTileRef = useRef<{ col: number; row: number } | null>(null);
+
+  const isPlaceable = useCallback(
+    (col: number, row: number) => {
+      if (col < 0 || col >= GRID_SIZE || row < 0 || row >= GRID_SIZE) return false;
+      if (MAP_MASK[row][col] === 0) return false;
+      if (col === 7 && row === 7) return false;
+      if (col === roverState.col && row === roverState.row) return false;
+      if (buildings.some((b) => b.col === col && b.row === row)) return false;
+      const deposit = roverState.deposits[getDepositKey(col, row)];
+      if (deposit && !deposit.depleted) return false;
+      return true;
+    },
+    [buildings, roverState.col, roverState.row, roverState.deposits]
+  );
+
+  const screenToWorld = useCallback((px: number, py: number) => {
+    const t = transformRef.current;
+    return {
+      x: (px - (t.w / 2 + t.panX)) / t.scale + t.w / 2,
+      y: (py - (t.h / 2 + t.panY)) / t.scale + t.h / 2,
+    };
+  }, []);
+
+  const pickTile = useCallback((worldX: number, worldY: number) => {
+    for (let i = DRAW_ORDER.length - 1; i >= 0; i--) {
+      const { col, row } = DRAW_ORDER[i];
+      if (MAP_MASK[row][col] === 0) continue;
+      const pos = tilePosRef.current[`${col},${row}`];
+      if (!pos) continue;
+      const cx = pos.sx + TILE_W / 2;
+      const cy = pos.sy;
+      if (
+        Math.abs(worldX - cx) / (TILE_W / 2) +
+          Math.abs(worldY - cy) / (TILE_H / 2) <=
+        1
+      ) {
+        return { col, row };
+      }
+    }
+    return null;
+  }, []);
 
   // Trail tracking
   useEffect(() => {
@@ -536,6 +758,8 @@ export default function IsometricGrid({
     const autoScale = Math.min(1.2, Math.max(0.35, Math.min((w - padding) / gridW, (h - padding) / gridH)));
     const totalScale = autoScale * zoom;
 
+    transformRef.current = { w, h, scale: totalScale, panX: pan.x, panY: pan.y };
+
     ctx.save();
     ctx.translate(w / 2 + pan.x, h / 2 + pan.y);
     ctx.scale(totalScale, totalScale);
@@ -546,42 +770,72 @@ export default function IsometricGrid({
       holesMap.set(getDepositKey(hItem.col, hItem.row), hItem.count);
     }
 
-    // Draw tiles (painter's sort)
-    for (let r = 0; r < GRID_SIZE; r++) {
-      for (let c = 0; c < GRID_SIZE; c++) {
-        const tile = MAP[r][c];
-        const { x: sx, y: sy } = isoToScreen(c, r, originX, originY, tile.elevation);
-        const onTrail = trailRef.current.some((t) => t.col === c && t.row === r);
-        const isRoverPos = c === roverState.col && r === roverState.row;
+    const buildingByKey = new Map<string, Building>();
+    for (const building of buildings) {
+      buildingByKey.set(`${building.col},${building.row}`, building);
+    }
 
-        const depKey = getDepositKey(c, r);
-        const deposit = roverState.deposits[depKey];
-        const drilledCount = holesMap.get(depKey);
-        const edgeTile = MAP_MASK[r][c] === 1 && isEdge(r, c);
+    // Draw tiles (painter's sort, back to front)
+    for (const { col: c, row: r } of DRAW_ORDER) {
+      const tile = MAP[r][c];
+      if (tile.type === "void") continue;
+      const { x: sx, y: sy } = isoToScreen(c, r, originX, originY, tile.elevation);
+      tilePosRef.current[`${c},${r}`] = { sx, sy };
+      const onTrail = trailRef.current.some((t) => t.col === c && t.row === r);
+      const isRoverPos = c === roverState.col && r === roverState.row;
 
-        drawTile(
-          ctx,
-          sx,
-          sy,
-          tile,
-          c,
-          r,
-          onTrail && !isRoverPos,
-          deposit,
-          drilledCount,
-          time,
-          edgeTile
-        );
+      const depKey = getDepositKey(c, r);
+      const deposit = roverState.deposits[depKey];
+      const drilledCount = holesMap.get(depKey);
+      const edgeTile = isEdge(r, c);
 
-        const isRadiation = radiationZones.some((z) => z.col === c && z.row === r);
-        if (isRadiation) {
-          drawRadiationZone(ctx, sx, sy, time);
-        }
+      drawTile(
+        ctx,
+        sx,
+        sy,
+        tile,
+        c,
+        r,
+        onTrail && !isRoverPos,
+        deposit,
+        drilledCount,
+        time,
+        edgeTile
+      );
+
+      if (buildingByKey.has(`${c},${r}`)) {
+        drawChargingStation(ctx, sx + TILE_W / 2, sy, time);
+      }
+
+      const isRadiation = radiationZones.some((z) => z.col === c && z.row === r);
+      if (isRadiation) {
+        drawRadiationZone(ctx, sx, sy, time);
+      }
+    }
+
+    const hover = hoverTileRef.current;
+    if (placingBuilding && hover) {
+      const pos = tilePosRef.current[`${hover.col},${hover.row}`];
+      if (pos) {
+        drawChargingStation(ctx, pos.sx + TILE_W / 2, pos.sy, time, {
+          ghost: true,
+          invalid: !isPlaceable(hover.col, hover.row),
+        });
       }
     }
 
     ctx.restore();
-  }, [roverState, progress, currentAction, zoom, pan, radiationZones]);
+  }, [
+    roverState,
+    progress,
+    currentAction,
+    zoom,
+    pan,
+    radiationZones,
+    buildings,
+    placingBuilding,
+    isPlaceable,
+  ]);
 
   // Animation loop
   useEffect(() => {
@@ -615,8 +869,8 @@ export default function IsometricGrid({
     if (!panInitializedRef.current && containerSize.width > 0) {
       panInitializedRef.current = true;
       const missionWindowWidth = Math.min(
-        760,
-        Math.max(420, containerSize.width * 0.44)
+        620,
+        Math.max(360, containerSize.width * 0.38)
       );
       setPan({ x: missionWindowWidth / 2, y: 0 });
     }
@@ -626,6 +880,7 @@ export default function IsometricGrid({
   const handlePointerDown = (e: React.PointerEvent<HTMLDivElement>) => {
     if (e.button !== 0) return;
     setIsDragging(true);
+    pointerDownRef.current = { x: e.clientX, y: e.clientY };
     dragStartRef.current = {
       x: e.clientX,
       y: e.clientY,
@@ -638,6 +893,12 @@ export default function IsometricGrid({
   };
 
   const handlePointerMove = (e: React.PointerEvent<HTMLDivElement>) => {
+    if (placingBuilding && containerRef.current) {
+      const rect = containerRef.current.getBoundingClientRect();
+      const world = screenToWorld(e.clientX - rect.left, e.clientY - rect.top);
+      hoverTileRef.current = pickTile(world.x, world.y);
+    }
+
     if (!isDragging) return;
     const dx = e.clientX - dragStartRef.current.x;
     const dy = e.clientY - dragStartRef.current.y;
@@ -648,12 +909,30 @@ export default function IsometricGrid({
   };
 
   const handlePointerUp = (e: React.PointerEvent<HTMLDivElement>) => {
+    if (placingBuilding && onPlaceBuilding && containerRef.current) {
+      const down = pointerDownRef.current;
+      const moved = down
+        ? Math.hypot(e.clientX - down.x, e.clientY - down.y)
+        : Infinity;
+      if (moved < 6) {
+        const rect = containerRef.current.getBoundingClientRect();
+        const world = screenToWorld(e.clientX - rect.left, e.clientY - rect.top);
+        const tile = pickTile(world.x, world.y);
+        if (tile) onPlaceBuilding(tile.col, tile.row);
+      }
+    }
+
+    pointerDownRef.current = null;
     if (isDragging) {
       setIsDragging(false);
       try {
         e.currentTarget.releasePointerCapture(e.pointerId);
       } catch {}
     }
+  };
+
+  const handlePointerLeave = () => {
+    if (placingBuilding) hoverTileRef.current = null;
   };
 
   const handleWheel = (e: React.WheelEvent<HTMLDivElement>) => {
@@ -675,7 +954,7 @@ export default function IsometricGrid({
   const handleResetView = (e: React.MouseEvent) => {
     e.stopPropagation();
     const w = containerRef.current?.clientWidth ?? 0;
-    const missionWindowWidth = Math.min(760, Math.max(420, w * 0.44));
+    const missionWindowWidth = Math.min(620, Math.max(360, w * 0.38));
     setZoom(DEFAULT_ZOOM);
     setPan({ x: missionWindowWidth / 2, y: 0 });
   };
@@ -742,12 +1021,13 @@ export default function IsometricGrid({
       onPointerDown={handlePointerDown}
       onPointerMove={handlePointerMove}
       onPointerUp={handlePointerUp}
+      onPointerLeave={handlePointerLeave}
       onWheel={handleWheel}
       style={{
         width: "100%",
         height: "100%",
         position: "relative",
-        cursor: isDragging ? "grabbing" : "grab",
+        cursor: placingBuilding ? "crosshair" : isDragging ? "grabbing" : "grab",
         userSelect: "none",
         touchAction: "none",
       }}
@@ -835,6 +1115,8 @@ export default function IsometricGrid({
 
       {/* Bottom Right: Camera controls */}
       <div
+        onPointerDown={(e) => e.stopPropagation()}
+        onPointerUp={(e) => e.stopPropagation()}
         style={{
           position: "absolute",
           bottom: 10,

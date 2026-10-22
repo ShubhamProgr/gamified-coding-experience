@@ -1,6 +1,6 @@
 "use client";
 
-import { useRef, useCallback } from "react";
+import { useRef, useCallback, useEffect } from "react";
 import Editor, { OnMount } from "@monaco-editor/react";
 import type { editor, languages, Position } from "monaco-editor";
 
@@ -9,6 +9,7 @@ interface CodeEditorProps {
   onChange: (value: string) => void;
   language?: string;
   readOnly?: boolean;
+  chargingUnlocked?: boolean;
 }
 
 export const DEFAULT_CODES: Record<string, string> = {
@@ -66,12 +67,12 @@ const MARS_THEME: editor.IStandaloneThemeData = {
     { token: "operator",       foreground: "e8631a" },
   ],
   colors: {
-    "editor.background":           "#0d1117",
+    "editor.background":           "#000000",
     "editor.foreground":           "#c9d1d9",
     "editorLineNumber.foreground": "#3d4f61",
     "editorLineNumber.activeForeground": "#6a8aa8",
     "editor.selectionBackground":  "#1e3a5f",
-    "editor.lineHighlightBackground": "#111827",
+    "editor.lineHighlightBackground": "#0a0a0a",
     "editorCursor.foreground":     "#00d4ff",
     "editorIndentGuide.background1": "#1e2d42",
     "editorIndentGuide.activeBackground1": "#2a4a6a",
@@ -92,8 +93,14 @@ export default function CodeEditor({
   onChange,
   language = "python",
   readOnly = false,
+  chargingUnlocked = false,
 }: CodeEditorProps) {
   const editorRef = useRef<editor.IStandaloneCodeEditor | null>(null);
+  const chargingUnlockedRef = useRef(chargingUnlocked);
+
+  useEffect(() => {
+    chargingUnlockedRef.current = chargingUnlocked;
+  }, [chargingUnlocked]);
 
   const handleMount: OnMount = useCallback((ed, monaco) => {
     editorRef.current = ed;
@@ -136,18 +143,27 @@ export default function CodeEditor({
             range,
           } as languages.CompletionItem);
 
-          return {
-            suggestions: [
-              mkSnippet('drive("FRONT")', 'drive("${1|FRONT,BACK,LEFT,RIGHT|}")', "Move one tile in a directional relative axis"),
-              mkSnippet("drill()", "drill()", "Engage core drill to extract minerals & core samples"),
-              mkSnippet("scan()", "scan()", "Analyze subsurface mineral composition & reserves"),
-              mkSnippet("charge()", "charge(${1:10})", "Recharge battery (needs solar tile)"),
-              mkSnippet("turn_left()", "turn_left()", "Rotate rover 90° left"),
-              mkSnippet("turn_right()", "turn_right()", "Rotate rover 90° right"),
-              mkSnippet("get_position()", "get_position()", "Returns current grid position"),
-              mkSnippet('log("message")', 'log("${1:message}")', "Print a custom log message"),
-            ],
-          };
+          const suggestions = [
+            mkSnippet('drive("FRONT")', 'drive("${1|FRONT,BACK,LEFT,RIGHT|}")', "Move one tile in a directional relative axis"),
+            mkSnippet("drill()", "drill()", "Engage core drill to extract minerals & core samples"),
+            mkSnippet("scan()", "scan()", "Analyze subsurface mineral composition & reserves"),
+            mkSnippet("turn_left()", "turn_left()", "Rotate rover 90° left"),
+            mkSnippet("turn_right()", "turn_right()", "Rotate rover 90° right"),
+            mkSnippet("get_position()", "get_position()", "Returns current grid position"),
+            mkSnippet('log("message")', 'log("${1:message}")', "Print a custom log message"),
+          ];
+          if (chargingUnlockedRef.current) {
+            suggestions.splice(
+              3,
+              0,
+              mkSnippet(
+                "charge()",
+                "charge(${1:10})",
+                "Recharge battery at a Charging Station"
+              )
+            );
+          }
+          return { suggestions };
         },
       });
     }

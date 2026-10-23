@@ -115,9 +115,9 @@ export default function CodeEditor({
         triggerCharacters: ["."],
         provideCompletionItems(model: editor.ITextModel, position: Position) {
           const lineText = model.getLineContent(position.lineNumber);
-          const wordBefore = lineText.slice(0, position.column - 1);
+          const textBefore = lineText.slice(0, position.column - 1);
 
-          if (!wordBefore.trimEnd().endsWith("rover")) {
+          if (!/rover\s*\.\s*$/.test(textBefore)) {
             return { suggestions: [] };
           }
 

@@ -211,11 +211,17 @@ def _run_cpp(code: str) -> RunResponse:
         
         executable = temp_dir_path / ("main.exe" if os.name == "nt" else "main")
         
-        compile_res = subprocess.run(
-            ["g++", str(source_file), "-I", str(SDK_DIR), "-o", str(executable)],
-            capture_output=True,
-            text=True
-        )
+        try:
+            compile_res = subprocess.run(
+                ["g++", str(source_file), "-I", str(SDK_DIR), "-o", str(executable)],
+                capture_output=True,
+                text=True
+            )
+        except FileNotFoundError:
+            return RunResponse(
+                actions=[],
+                error="C++ toolchain unavailable: the server could not find `g++`.",
+            )
         if compile_res.returncode != 0:
             return RunResponse(actions=[], error=f"Compilation Error:\n{compile_res.stderr.strip()}")
             
@@ -228,6 +234,8 @@ def _run_cpp(code: str) -> RunResponse:
             )
         except subprocess.TimeoutExpired:
             return RunResponse(actions=[], error=f"TimeoutError: Code exceeded the {TIMEOUT_SECONDS}s execution limit.")
+        except OSError as exc:
+            return RunResponse(actions=[], error=f"Execution Error: {exc}")
 
     actions = []
     parse_errors = []
@@ -258,11 +266,17 @@ def _run_java(code: str) -> RunResponse:
         source_file = temp_dir_path / "Main.java"
         source_file.write_text(code, encoding="utf-8")
         
-        compile_res = subprocess.run(
-            ["javac", "-sourcepath", str(SDK_DIR), "-d", str(temp_dir_path), str(source_file)],
-            capture_output=True,
-            text=True
-        )
+        try:
+            compile_res = subprocess.run(
+                ["javac", "-sourcepath", str(SDK_DIR), "-d", str(temp_dir_path), str(source_file)],
+                capture_output=True,
+                text=True
+            )
+        except FileNotFoundError:
+            return RunResponse(
+                actions=[],
+                error="Java toolchain unavailable: the server could not find `javac`. Install a JDK on the backend to run Java.",
+            )
         if compile_res.returncode != 0:
             return RunResponse(actions=[], error=f"Compilation Error:\n{compile_res.stderr.strip()}")
             
@@ -275,6 +289,11 @@ def _run_java(code: str) -> RunResponse:
             )
         except subprocess.TimeoutExpired:
             return RunResponse(actions=[], error=f"TimeoutError: Code exceeded the {TIMEOUT_SECONDS}s execution limit.")
+        except FileNotFoundError:
+            return RunResponse(
+                actions=[],
+                error="Java runtime unavailable: the server could not find `java`. Install a JDK on the backend to run Java.",
+            )
 
     actions = []
     parse_errors = []

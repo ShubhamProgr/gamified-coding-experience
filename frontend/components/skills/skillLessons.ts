@@ -168,7 +168,7 @@ while (steps < 3) {
       "Rotate 90° in place. turn_left() is counter-clockwise; turn_right() is clockwise.",
     examples: {
       python: `rover.turn_left()`,
-      java: `rover.turn_left();`,
+      java: `rover.turnLeft();`,
       cpp: `rover.turn_left();`,
     },
   },
@@ -190,7 +190,7 @@ while (steps < 3) {
 rover.turn_right()
 rover.drive("FRONT")`,
       java: `rover.drive("FRONT");
-rover.turn_right();
+rover.turnRight();
 rover.drive("FRONT");`,
       cpp: `rover.drive("FRONT");
 rover.turn_right();

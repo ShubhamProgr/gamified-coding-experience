@@ -441,12 +441,12 @@ export function useRoverAnimation(
 
   // Start/pause playback
   const play = useCallback(() => {
-    if (isFinished) return;
     lastTickRef.current = performance.now();
     setIsPlaying(true);
     isPlayingRef.current = true;
+    if (rafRef.current) cancelAnimationFrame(rafRef.current);
     rafRef.current = requestAnimationFrame((ts) => tickRef.current(ts));
-  }, [isFinished]);
+  }, []);
 
   const pause = useCallback(() => {
     setIsPlaying(false);

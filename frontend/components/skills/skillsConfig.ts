@@ -31,11 +31,11 @@ export interface SkillNode {
 }
 
 const ROVER_CALL =
-  /\brover\s*\.\s*(?:drive|drill|scan|turn_left|turn_right|charge)\s*\(/;
+  /\brover\s*\.\s*(?:drive|drill|scan|turn_left|turn_right|turnLeft|turnRight|charge)\s*\(/;
 const DRIVE_CALL = /\brover\s*\.\s*drive\s*\(/;
 const DRILL_CALL = /\brover\s*\.\s*drill\s*\(/;
 const SCAN_CALL = /\brover\s*\.\s*scan\s*\(/;
-const TURN_CALL = /\brover\s*\.\s*(?:turn_left|turn_right)\s*\(/;
+const TURN_CALL = /\brover\s*\.\s*(?:turn_left|turn_right|turnLeft|turnRight)\s*\(/;
 const CHARGE_CALL = /\brover\s*\.\s*charge\s*\(/;
 const IF_CALL = /\b(?:if|elif)\b/;
 const FOR_CALL = /\bfor\b/;

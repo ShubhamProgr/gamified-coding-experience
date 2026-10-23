@@ -1,5 +1,8 @@
 "use client";
 
+import SkillTree from "@/components/skills/SkillTree";
+import type { SkillId } from "@/components/skills/skillsConfig";
+
 interface ToolbarProps {
   isPlaying: boolean;
   isFinished: boolean;
@@ -13,6 +16,7 @@ interface ToolbarProps {
   onLanguageChange?: (lang: string) => void;
   totalActions: number;
   actionIndex: number;
+  unlockedSkills: SkillId[];
 }
 
 const SPEED_STEPS = [
@@ -35,6 +39,7 @@ export default function Toolbar({
   onLanguageChange,
   totalActions,
   actionIndex,
+  unlockedSkills,
 }: ToolbarProps) {
   const actionsCompleted = Math.max(0, actionIndex + 1);
 
@@ -174,6 +179,9 @@ export default function Toolbar({
 
       {/* Spacer */}
       <div style={{ flex: 1 }} />
+
+      {/* Skill tree */}
+      <SkillTree unlockedIds={unlockedSkills} language={language} />
 
       {/* Language selector */}
       <select

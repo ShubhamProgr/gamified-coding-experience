@@ -23,6 +23,10 @@ import {
 } from "@/components/buildings/buildingsConfig";
 import { GRID_SIZE, MAP_MASK } from "@/components/Canvas/mapConfig";
 import { getDepositKey } from "@/components/Canvas/minerals";
+import { useSkillTree } from "@/components/skills/useSkillTree";
+import { SKILL_MAP, type SkillId } from "@/components/skills/skillsConfig";
+import SkillUnlockModal from "@/components/skills/SkillUnlockModal";
+import type { LessonLanguage } from "@/components/skills/skillLessons";
 
 // Monaco must be loaded client-side only (no SSR)
 const CodeEditor = dynamic(() => import("@/components/IDE/CodeEditor"), {
@@ -56,10 +60,7 @@ const CodeEditor = dynamic(() => import("@/components/IDE/CodeEditor"), {
   ),
 });
 
-const API_URL =
-  process.env.NODE_ENV === "development"
-    ? "http://localhost:8000"
-    : process.env.BACKEND_RENDER_URL ?? "http://localhost:8000";
+const API_URL = process.env.BACKEND_RENDER_URL ?? "http://localhost:8000";
 
 
 function makeId() {
@@ -90,6 +91,8 @@ export default function Home() {
   const [isRunning, setIsRunning] = useState(false);
   const [actions, setActions] = useState<RoverAction[]>([]);
   const [logs, setLogs] = useState<LogEntry[]>([]);
+  const { unlocked: unlockedSkills, unlockFromCode } = useSkillTree();
+  const [skillUnlock, setSkillUnlock] = useState<SkillId[] | null>(null);
 
   // Layout states
   const [activeTab, setActiveTab] = useState<"code" | "console">("code");
@@ -197,6 +200,17 @@ export default function Home() {
       if (data.error) {
         appendLog({ type: "error", message: data.error });
         setActiveTab("console");
+      } else {
+        const newSkills = unlockFromCode(code);
+        if (newSkills.length > 0) {
+          setSkillUnlock(newSkills);
+          newSkills.forEach((id) =>
+            appendLog({
+              type: "system",
+              message: `🧠 Skill unlocked: ${SKILL_MAP[id].name}`,
+            })
+          );
+        }
       }
 
       if (data.actions.length > 0) {
@@ -212,12 +226,15 @@ export default function Home() {
       }
     } catch (err: unknown) {
       const message = err instanceof Error ? err.message : String(err);
-      appendLog({ type: "error", message: `Connection error: ${message}` });
+      appendLog({
+        type: "error",
+        message: `Connection error: ${message} (API: ${API_URL})`,
+      });
       setActiveTab("console");
     } finally {
       setIsRunning(false);
     }
-  }, [code, language, isRunning, reset, appendLog, play]);
+  }, [code, language, isRunning, reset, appendLog, play, unlockFromCode]);
 
   // ── Log new actions as they play ──────────────────────────────────────────
   useEffect(() => {
@@ -380,6 +397,9 @@ export default function Home() {
     ]
   );
 
+  const lessonLanguage: LessonLanguage =
+    language === "java" || language === "cpp" ? language : "python";
+
   return (
     <div
       style={{
@@ -404,7 +424,18 @@ export default function Home() {
         onLanguageChange={handleLanguageChange}
         totalActions={totalActions}
         actionIndex={roverState.actionIndex}
+        unlockedSkills={unlockedSkills}
       />
+
+      {/* Skill unlock lesson */}
+      {skillUnlock && (
+        <SkillUnlockModal
+          skills={skillUnlock}
+          unlockedIds={unlockedSkills}
+          language={lessonLanguage}
+          onClose={() => setSkillUnlock(null)}
+        />
+      )}
 
       {/* Round objective banner */}
       <RoundBanner

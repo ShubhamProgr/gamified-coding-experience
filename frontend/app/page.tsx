@@ -91,7 +91,12 @@ export default function Home() {
   const [isRunning, setIsRunning] = useState(false);
   const [actions, setActions] = useState<RoverAction[]>([]);
   const [logs, setLogs] = useState<LogEntry[]>([]);
-  const { unlocked: unlockedSkills, unlockFromCode } = useSkillTree();
+  const {
+    unlocked: unlockedSkills,
+    minerals: skillMinerals,
+    unlockFromCode,
+    addMinerals,
+  } = useSkillTree();
   const [skillUnlock, setSkillUnlock] = useState<SkillId[] | null>(null);
 
   // Layout states
@@ -152,13 +157,14 @@ export default function Home() {
   useEffect(() => {
     if (isFinished && !finishedReportedRef.current && actions.length > 0) {
       finishedReportedRef.current = true;
+      addMinerals(roverState.minerals);
       handleRoundFinished(
         roverState.minerals,
         roverState.battery,
         roverState.inventory
       );
     }
-  }, [isFinished, actions.length, roverState.minerals, roverState.battery, roverState.inventory, handleRoundFinished]);
+  }, [isFinished, actions.length, roverState.minerals, roverState.battery, roverState.inventory, handleRoundFinished, addMinerals]);
 
   // Reset the "finished reported" flag each time a new run starts
   useEffect(() => {
@@ -425,6 +431,7 @@ export default function Home() {
         totalActions={totalActions}
         actionIndex={roverState.actionIndex}
         unlockedSkills={unlockedSkills}
+        skillMinerals={skillMinerals}
       />
 
       {/* Skill unlock lesson */}

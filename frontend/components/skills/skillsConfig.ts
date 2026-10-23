@@ -235,6 +235,8 @@ export const UNLOCKABLE_SKILLS = SKILL_NODES.filter(
   (node) => node.kind === "skill"
 );
 
+export const MASTERY_TARGET = 200;
+
 function stripCommentsAndStrings(code: string): string {
   return code
     .replace(/\/\*[\s\S]*?\*\//g, " ")

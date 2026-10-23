@@ -17,6 +17,7 @@ interface ToolbarProps {
   totalActions: number;
   actionIndex: number;
   unlockedSkills: SkillId[];
+  skillMinerals: Partial<Record<SkillId, number>>;
 }
 
 const SPEED_STEPS = [
@@ -40,6 +41,7 @@ export default function Toolbar({
   totalActions,
   actionIndex,
   unlockedSkills,
+  skillMinerals,
 }: ToolbarProps) {
   const actionsCompleted = Math.max(0, actionIndex + 1);
 
@@ -181,7 +183,11 @@ export default function Toolbar({
       <div style={{ flex: 1 }} />
 
       {/* Skill tree */}
-      <SkillTree unlockedIds={unlockedSkills} language={language} />
+      <SkillTree
+        unlockedIds={unlockedSkills}
+        skillMinerals={skillMinerals}
+        language={language}
+      />
 
       {/* Language selector */}
       <select

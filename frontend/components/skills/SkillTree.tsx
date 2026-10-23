@@ -3,13 +3,14 @@
 import { useEffect, useState } from "react";
 import { createPortal } from "react-dom";
 import {
+  MASTERY_TARGET,
   SKILL_MAP,
   SKILL_NODES,
   SkillId,
   SkillNode,
   UNLOCKABLE_SKILLS,
 } from "./skillsConfig";
-import { SKILL_LESSONS, type LessonLanguage } from "./skillLessons";
+import SkillLessonModal from "./SkillLessonModal";
 
 const CANVAS_WIDTH = 1210;
 const CANVAS_HEIGHT = 870;
@@ -41,25 +42,27 @@ function isDescendantOf(childId: SkillId, ancestorId: SkillId): boolean {
 
 interface SkillTreeProps {
   unlockedIds: SkillId[];
+  skillMinerals: Partial<Record<SkillId, number>>;
   language: string;
 }
 
-export default function SkillTree({ unlockedIds, language }: SkillTreeProps) {
+export default function SkillTree({
+  unlockedIds,
+  skillMinerals,
+  language,
+}: SkillTreeProps) {
   const [open, setOpen] = useState(false);
   const [selectedId, setSelectedId] = useState<SkillId | null>(null);
 
-  const lessonLanguage: LessonLanguage =
-    language === "java" || language === "cpp" ? language : "python";
-
   useEffect(() => {
-    if (!open) return;
+    if (!open || selectedId) return;
 
     const handleKey = (e: KeyboardEvent) => {
       if (e.key === "Escape") setOpen(false);
     };
     window.addEventListener("keydown", handleKey);
     return () => window.removeEventListener("keydown", handleKey);
-  }, [open]);
+  }, [open, selectedId]);
 
   const unlockedCount = UNLOCKABLE_SKILLS.filter((s) =>
     unlockedIds.includes(s.id)
@@ -73,14 +76,10 @@ export default function SkillTree({ unlockedIds, language }: SkillTreeProps) {
     return unlockedIds.includes(node.id);
   };
 
-  const selectedNode = selectedId ? SKILL_MAP[selectedId] : null;
-  const selectedLesson = selectedId ? SKILL_LESSONS[selectedId] : undefined;
-  const selectedUnlocked = selectedId ? unlockedIds.includes(selectedId) : false;
-  const parentNode = selectedNode?.parent ? SKILL_MAP[selectedNode.parent] : null;
-  const parentLocked =
-    !!parentNode &&
-    parentNode.kind === "skill" &&
-    !unlockedIds.includes(parentNode.id);
+  const closeTree = () => {
+    setOpen(false);
+    setSelectedId(null);
+  };
 
   return (
     <>
@@ -128,10 +127,7 @@ export default function SkillTree({ unlockedIds, language }: SkillTreeProps) {
             aria-modal="true"
             aria-label="Skill tree"
             onMouseDown={(e) => {
-              if (e.target === e.currentTarget) {
-                setOpen(false);
-                setSelectedId(null);
-              }
+              if (e.target === e.currentTarget) closeTree();
             }}
             style={{
               position: "fixed",
@@ -173,7 +169,14 @@ export default function SkillTree({ unlockedIds, language }: SkillTreeProps) {
                 }}
               >
                 <span style={{ display: "flex", alignItems: "center", gap: 5 }}>
-                  <span className="window-btn window-btn--red" style={{ width: 10, height: 10 }} />
+                  <button
+                    type="button"
+                    onClick={closeTree}
+                    aria-label="Close skill tree"
+                    title="Close"
+                    className="window-btn window-btn--red"
+                    style={{ width: 10, height: 10, padding: 0 }}
+                  />
                   <span className="window-btn window-btn--yellow" style={{ width: 10, height: 10 }} />
                   <span className="window-btn window-btn--green" style={{ width: 10, height: 10 }} />
                 </span>
@@ -238,31 +241,6 @@ export default function SkillTree({ unlockedIds, language }: SkillTreeProps) {
                     />
                   </div>
                 </div>
-
-                <button
-                  type="button"
-                  onClick={() => {
-                    setOpen(false);
-                    setSelectedId(null);
-                  }}
-                  aria-label="Close skill tree"
-                  style={{
-                    display: "flex",
-                    alignItems: "center",
-                    justifyContent: "center",
-                    width: 30,
-                    height: 30,
-                    border: "1px solid var(--space-border)",
-                    borderRadius: "var(--radius-sm)",
-                    background: "transparent",
-                    color: "var(--text-secondary)",
-                    fontSize: 18,
-                    lineHeight: 1,
-                    cursor: "pointer",
-                  }}
-                >
-                  ×
-                </button>
               </div>
 
               {/* Tree canvas */}
@@ -355,6 +333,11 @@ export default function SkillTree({ unlockedIds, language }: SkillTreeProps) {
                         : "none";
 
                     const selected = selectedId === node.id;
+                    const progress = node.kind === "skill"
+                      ? skillMinerals[node.id] ?? 0
+                      : 0;
+                    const mastered =
+                      node.kind === "skill" && progress >= MASTERY_TARGET;
 
                     return (
                       <button
@@ -433,9 +416,11 @@ export default function SkillTree({ unlockedIds, language }: SkillTreeProps) {
                           <div
                             style={{
                               fontSize: 9.5,
-                              color: unlocked
+                              color: mastered
                                 ? "var(--glow-green)"
-                                : "var(--text-muted)",
+                                : unlocked
+                                  ? "var(--text-secondary)"
+                                  : "var(--text-muted)",
                               whiteSpace: "nowrap",
                               overflow: "hidden",
                               textOverflow: "ellipsis",
@@ -448,7 +433,9 @@ export default function SkillTree({ unlockedIds, language }: SkillTreeProps) {
                                   ? "Branch active"
                                   : "Branch"
                                 : unlocked
-                                  ? "Unlocked"
+                                  ? mastered
+                                    ? "Mastered ✓"
+                                    : `${progress}/${MASTERY_TARGET} minerals`
                                   : node.hint}
                           </div>
                         </div>
@@ -472,153 +459,20 @@ export default function SkillTree({ unlockedIds, language }: SkillTreeProps) {
                 </div>
               </div>
 
-              {/* Clicked-node lesson */}
-              {selectedNode && (
-                <div
-                  style={{
-                    flexShrink: 0,
-                    borderTop: "1px solid var(--space-border)",
-                    background: "#0d121b",
-                    padding: "12px 18px",
-                    display: "flex",
-                    flexWrap: "wrap",
-                    gap: 16,
-                    maxHeight: 230,
-                    overflowY: "auto",
-                  }}
-                >
-                  <div style={{ flex: "1 1 240px", minWidth: 0 }}>
-                    <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
-                      <span style={{ fontSize: 20 }}>{selectedNode.icon}</span>
-                      <span
-                        style={{
-                          fontSize: 13,
-                          fontWeight: 700,
-                          color: "var(--text-primary)",
-                        }}
-                      >
-                        {selectedNode.name}
-                      </span>
-                      <span
-                        style={{
-                          fontSize: 9,
-                          fontWeight: 700,
-                          letterSpacing: "0.08em",
-                          textTransform: "uppercase",
-                          padding: "2px 7px",
-                          borderRadius: 10,
-                          border: "1px solid",
-                          color: selectedUnlocked
-                            ? "var(--glow-green)"
-                            : selectedNode.kind === "skill"
-                              ? "var(--text-muted)"
-                              : selectedNode.kind === "root"
-                                ? "var(--mars-orange)"
-                                : "var(--glow-cyan)",
-                          borderColor: selectedUnlocked
-                            ? "rgba(0,255,136,0.35)"
-                            : "var(--space-border)",
-                        }}
-                      >
-                        {selectedNode.kind === "root"
-                          ? "Core"
-                          : selectedNode.kind === "branch"
-                            ? "Branch"
-                            : selectedUnlocked
-                              ? "Unlocked"
-                              : "Locked"}
-                      </span>
-                      <div style={{ flex: 1 }} />
-                      <button
-                        type="button"
-                        onClick={() => setSelectedId(null)}
-                        aria-label="Close lesson"
-                        style={{
-                          display: "flex",
-                          alignItems: "center",
-                          justifyContent: "center",
-                          width: 24,
-                          height: 24,
-                          border: "1px solid var(--space-border)",
-                          borderRadius: "var(--radius-sm)",
-                          background: "transparent",
-                          color: "var(--text-secondary)",
-                          fontSize: 15,
-                          lineHeight: 1,
-                          cursor: "pointer",
-                        }}
-                      >
-                        ×
-                      </button>
-                    </div>
-
-                    <div
-                      style={{
-                        marginTop: 8,
-                        fontSize: 11.5,
-                        lineHeight: 1.55,
-                        color: "var(--text-secondary)",
-                      }}
-                    >
-                      {selectedNode.kind === "skill" && !selectedUnlocked ? (
-                        <>
-                          <span
-                            style={{
-                              color: "var(--glow-cyan)",
-                              fontWeight: 600,
-                            }}
-                          >
-                            How to unlock:{" "}
-                          </span>
-                          {selectedNode.hint}
-                          {parentLocked && parentNode && (
-                            <>
-                              {" "}
-                              First unlock{" "}
-                              <span
-                                style={{
-                                  color: "var(--text-primary)",
-                                  fontWeight: 600,
-                                }}
-                              >
-                                {parentNode.name}
-                              </span>
-                              .
-                            </>
-                          )}
-                        </>
-                      ) : (
-                        selectedLesson?.summary ?? selectedNode.hint
-                      )}
-                    </div>
-                  </div>
-
-                  {selectedLesson && (
-                    <pre
-                      style={{
-                        flex: "1 1 260px",
-                        margin: 0,
-                        padding: "10px 12px",
-                        borderRadius: "var(--radius-sm)",
-                        background: "#000000",
-                        border: "1px solid var(--space-border)",
-                        color: "var(--text-code)",
-                        fontFamily: "var(--font-code)",
-                        fontSize: 11,
-                        lineHeight: 1.6,
-                        whiteSpace: "pre",
-                        overflowX: "auto",
-                      }}
-                    >
-                      {selectedLesson.examples[lessonLanguage]}
-                    </pre>
-                  )}
-                </div>
-              )}
             </div>
           </div>,
           document.body
         )}
+
+      {selectedId && (
+        <SkillLessonModal
+          skillId={selectedId}
+          unlockedIds={unlockedIds}
+          minerals={skillMinerals}
+          language={language}
+          onClose={() => setSelectedId(null)}
+        />
+      )}
     </>
   );
 }

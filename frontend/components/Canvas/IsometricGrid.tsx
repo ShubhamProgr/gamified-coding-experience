@@ -9,7 +9,7 @@ import {
   INITIAL_DEPOSIT_CONFIGS,
 } from "./minerals";
 import type { RadiationZone } from "../rounds/roundsConfig";
-import { GRID_SIZE, MAP_MASK } from "./mapConfig";
+import { GRID_SIZE, MAP_MASK, START_CELL } from "./mapConfig";
 import RoverModel from "./RoverModel";
 import { drawChargingStation } from "./drawChargingStation";
 import type { Building } from "../buildings/buildingsConfig";
@@ -59,8 +59,6 @@ const RIDGE_CELLS: Array<[number, number]> = [
 function generateMap(): Tile[][] {
   const rand = seededRand(42);
   const map: Tile[][] = [];
-  const startCol = 7;
-  const startRow = 7;
 
   for (let r = 0; r < GRID_SIZE; r++) {
     map[r] = [];
@@ -76,7 +74,7 @@ function generateMap(): Tile[][] {
       else if (v > 0.72) type = "rock";
       else if (v > 0.55) type = "dune";
 
-      if (r === startRow && c === startCol) type = "start";
+      if (r === START_CELL.row && c === START_CELL.col) type = "start";
 
       map[r][c] = {
         type,
@@ -541,7 +539,9 @@ function drawTile(
   }
 
   // Start tile — landing pad with rotating beacon ring
-  const isStartSite = tile.type === "start" || (col === 7 && row === 7);
+  const isStartSite =
+    tile.type === "start" ||
+    (col === START_CELL.col && row === START_CELL.row);
   if (isStartSite) {
     ctx.save();
     ctx.translate(cx, cy);
@@ -654,7 +654,7 @@ export default function IsometricGrid({
     (col: number, row: number) => {
       if (col < 0 || col >= GRID_SIZE || row < 0 || row >= GRID_SIZE) return false;
       if (MAP_MASK[row][col] === 0) return false;
-      if (col === 7 && row === 7) return false;
+      if (col === START_CELL.col && row === START_CELL.row) return false;
       if (col === roverState.col && row === roverState.row) return false;
       if (buildings.some((b) => b.col === col && b.row === row)) return false;
       const deposit = roverState.deposits[getDepositKey(col, row)];

@@ -1,7 +1,7 @@
 "use client";
 
 import { INITIAL_DEPOSIT_CONFIGS, type MineralType } from "../Canvas/minerals";
-import { GRID_SIZE, MAP_MASK } from "../Canvas/mapConfig";
+import { GRID_SIZE, MAP_MASK, START_CELL } from "../Canvas/mapConfig";
 
 // ── Round Configuration Types ─────────────────────────────────────────────
 
@@ -105,8 +105,6 @@ interface Cell {
   col: number;
   row: number;
 }
-
-const START_CELL: Cell = { col: 7, row: 7 };
 
 const WALKABLE_CELLS: Cell[] = [];
 for (let row = 0; row < GRID_SIZE; row++) {

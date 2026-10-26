@@ -9,7 +9,7 @@ import {
   getDepositKey,
 } from "./minerals";
 import type { RadiationZone } from "../rounds/roundsConfig";
-import { GRID_SIZE, MAP_MASK } from "./mapConfig";
+import { GRID_SIZE, MAP_MASK, START_CELL } from "./mapConfig";
 
 // ── Types ──────────────────────────────────────────────────────────────────
 
@@ -80,8 +80,8 @@ const BATTERY_COSTS: Record<string, number> = {
 };
 
 const BASE_STATE: Omit<RoverState, "deposits"> = {
-  col: 7,
-  row: 7,
+  col: START_CELL.col,
+  row: START_CELL.row,
   facing: "FRONT",
   battery: 100,
   minerals: 0,

@@ -827,8 +827,6 @@ export default function IsometricGrid({
     ctx.restore();
   }, [
     roverState,
-    progress,
-    currentAction,
     zoom,
     pan,
     radiationZones,
@@ -1133,39 +1131,100 @@ export default function IsometricGrid({
           zIndex: 5,
         }}
       >
-        {[
-          { onClick: handleZoomIn, label: "+", title: "Zoom In", disabled: zoom >= MAX_ZOOM, color: "var(--text-primary)" },
-          { onClick: handleZoomOut, label: "−", title: "Zoom Out", disabled: zoom <= MIN_ZOOM, color: "var(--text-primary)" },
-          { onClick: handleCenterRover, label: "🎯", title: "Center on Rover", disabled: false, color: "var(--glow-cyan)" },
-          { onClick: handleResetView, label: "⟲", title: "Reset View", disabled: false, color: "var(--text-muted)" },
-        ].map(({ onClick, label, title, disabled, color }) => (
-          <button
-            key={title}
-            type="button"
-            onClick={onClick}
-            onPointerDown={(e) => e.stopPropagation()}
-            aria-label={title}
-            disabled={disabled}
-            title={title}
-            style={{
-              width: 24,
-              height: 24,
-              background: "rgba(255,255,255,0.05)",
-              border: "1px solid rgba(255,255,255,0.08)",
-              borderRadius: "var(--radius-sm)",
-              color,
-              fontSize: 12,
-              fontWeight: 700,
-              cursor: disabled ? "default" : "pointer",
-              display: "flex",
-              alignItems: "center",
-              justifyContent: "center",
-              opacity: disabled ? 0.35 : 1,
-            }}
-          >
-            {label}
-          </button>
-        ))}
+        <button
+          onClick={handleZoomIn}
+          type="button"
+          onPointerDown={(e) => e.stopPropagation()}
+          aria-label="Zoom In"
+          disabled={zoom >= MAX_ZOOM}
+          style={{
+            width: 24,
+            height: 24,
+            background: "rgba(255,255,255,0.05)",
+            border: "1px solid rgba(255,255,255,0.08)",
+            borderRadius: "var(--radius-sm)",
+            color: "var(--text-primary)",
+            fontSize: 12,
+            fontWeight: 700,
+            cursor: zoom >= MAX_ZOOM ? "default" : "pointer",
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "center",
+            opacity: zoom >= MAX_ZOOM ? 0.35 : 1,
+          }}
+        >
+          +
+        </button>
+        <button
+          onClick={handleZoomOut}
+          type="button"
+          onPointerDown={(e) => e.stopPropagation()}
+          aria-label="Zoom Out"
+          disabled={zoom <= MIN_ZOOM}
+          style={{
+            width: 24,
+            height: 24,
+            background: "rgba(255,255,255,0.05)",
+            border: "1px solid rgba(255,255,255,0.08)",
+            borderRadius: "var(--radius-sm)",
+            color: "var(--text-primary)",
+            fontSize: 12,
+            fontWeight: 700,
+            cursor: zoom <= MIN_ZOOM ? "default" : "pointer",
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "center",
+            opacity: zoom <= MIN_ZOOM ? 0.35 : 1,
+          }}
+        >
+          −
+        </button>
+        <button
+          onClick={handleCenterRover}
+          type="button"
+          onPointerDown={(e) => e.stopPropagation()}
+          aria-label="Center on Rover"
+          style={{
+            width: 24,
+            height: 24,
+            background: "rgba(255,255,255,0.05)",
+            border: "1px solid rgba(255,255,255,0.08)",
+            borderRadius: "var(--radius-sm)",
+            color: "var(--glow-cyan)",
+            fontSize: 12,
+            fontWeight: 700,
+            cursor: "pointer",
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "center",
+            opacity: 1,
+          }}
+        >
+          🎯
+        </button>
+        <button
+          onClick={handleResetView}
+          type="button"
+          onPointerDown={(e) => e.stopPropagation()}
+          aria-label="Reset View"
+          style={{
+            width: 24,
+            height: 24,
+            background: "rgba(255,255,255,0.05)",
+            border: "1px solid rgba(255,255,255,0.08)",
+            borderRadius: "var(--radius-sm)",
+            color: "var(--text-muted)",
+            fontSize: 12,
+            fontWeight: 700,
+            cursor: "pointer",
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "center",
+            opacity: 1,
+          }}
+        >
+          ⟲
+        </button>
       </div>
 
       {/* Top Right: Playback indicator */}

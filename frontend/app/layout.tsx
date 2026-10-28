@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 import "./globals.css";
+import HomeNav from "@/components/HomeNav";
 
 export const metadata: Metadata = {
   title: "Mars Rover — Gamified Programming",
@@ -24,7 +25,10 @@ export default function RootLayout({
         <link rel="preconnect" href="https://fonts.googleapis.com" />
         <link rel="preconnect" href="https://fonts.gstatic.com" crossOrigin="anonymous" />
       </head>
-      <body style={{ height: "100vh", overflow: "hidden" }}>{children}</body>
+      <body style={{ height: "100vh", overflow: "hidden" }}>
+        <HomeNav />
+        {children}
+      </body>
     </html>
   );
 }

@@ -38,6 +38,7 @@ export interface RoundManagerAPI {
   resetAll: () => void;
   addBuilding: (building: Building) => void;
   syncInventory: (inventory: RoverInventory) => void;
+  hydrate: (saved: Partial<RoundManagerState>) => void;
 }
 
 // ── Hook ──────────────────────────────────────────────────────────────────
@@ -148,6 +149,35 @@ export function useRoundManager(): RoundManagerAPI {
     }));
   }, []);
 
+  const hydrate = useCallback((saved: Partial<RoundManagerState>) => {
+    setState((prev) => {
+      const next = { ...prev };
+      if (typeof saved.currentRound === "number") next.currentRound = saved.currentRound;
+      if (typeof saved.cumulativeMinerals === "number") {
+        next.cumulativeMinerals = saved.cumulativeMinerals;
+      }
+      if (typeof saved.persistentBattery === "number") {
+        next.persistentBattery = saved.persistentBattery;
+      }
+      if (saved.starsEarned) {
+        next.starsEarned = Array.from(
+          { length: MAX_ROUNDS },
+          (_, index) => saved.starsEarned?.[index] ?? 0
+        );
+      }
+      if (saved.persistentInventory) {
+        next.persistentInventory = { ...EMPTY_INVENTORY, ...saved.persistentInventory };
+      }
+      if (saved.buildings) next.buildings = saved.buildings;
+      return {
+        ...next,
+        roundStatus: "playing",
+        showCompleteModal: false,
+        showVictoryScreen: false,
+      };
+    });
+  }, []);
+
   return {
     state,
     currentRoundConfig,
@@ -158,5 +188,6 @@ export function useRoundManager(): RoundManagerAPI {
     resetAll,
     addBuilding,
     syncInventory,
+    hydrate,
   };
 }

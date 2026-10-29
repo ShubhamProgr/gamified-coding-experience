@@ -10,7 +10,7 @@ export default function HomeNav() {
     <header className="home-nav">
       <Link href="/" className="home-brand">
         <span className="home-brand-mark" aria-hidden="true" />
-        ROVER LAB
+        HOME
       </Link>
       <div className="home-nav-right">
         {user ? (

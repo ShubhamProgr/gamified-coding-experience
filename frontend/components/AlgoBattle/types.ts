@@ -130,6 +130,7 @@ export type BattleRating = {
   matches_played: number;
   wins: number;
   losses: number;
+  submissions: number;
   rank_tier: string;
 };
 

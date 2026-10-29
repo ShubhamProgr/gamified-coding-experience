@@ -218,6 +218,69 @@ html, body {
   to   { opacity: 1; transform: scale(1); }
 }
 
+@keyframes onboarding-node-fill {
+  0%, 100% { opacity: 0.12; transform: scale(0.7); }
+  45% { opacity: 1; transform: scale(1); box-shadow: 0 0 14px var(--glow-cyan); }
+}
+
+.mars-onboarding {
+  position: fixed;
+  inset: 0;
+  z-index: 100;
+  display: grid;
+  place-items: center;
+  overflow: hidden;
+  background: rgba(3, 6, 12, 0.98);
+}
+
+.mars-onboarding__nodes {
+  position: absolute;
+  inset: 8%;
+  display: grid;
+  grid-template-columns: repeat(12, 1fr);
+  gap: clamp(12px, 2vw, 28px);
+  transform: perspective(600px) rotateX(18deg);
+}
+
+.mars-onboarding__node {
+  width: 5px;
+  height: 5px;
+  justify-self: center;
+  align-self: center;
+  border-radius: 50%;
+  background: var(--glow-cyan);
+  animation: onboarding-node-fill 1.4s ease-in-out infinite;
+}
+
+.mars-onboarding__content {
+  position: relative;
+  max-width: 560px;
+  padding: 36px;
+  text-align: center;
+  background: rgba(13, 17, 23, 0.8);
+  border: 1px solid var(--space-border-glow);
+  border-radius: var(--radius-lg);
+  box-shadow: 0 0 55px rgba(0, 212, 255, 0.18);
+}
+
+.mars-onboarding__eyebrow {
+  margin-bottom: 14px;
+  color: var(--glow-cyan);
+  font-family: var(--font-code);
+  font-size: 11px;
+  letter-spacing: 0.16em;
+}
+
+.mars-onboarding h1 {
+  font-size: clamp(22px, 3vw, 34px);
+  font-weight: 500;
+}
+
+.mars-onboarding p {
+  margin-top: 12px;
+  color: var(--text-secondary);
+}
+
 @keyframes victory-in {
   from { opacity: 0; transform: scale(0.7) translateY(30px); }
   to   { opacity: 1; transform: scale(1) translateY(0); }
@@ -587,7 +650,7 @@ html, body {
   justify-content: flex-start;
   width: 100%;
   min-height: calc(100vh - 66px);
-  padding: clamp(110px, 24vh, 260px) 0 48px;
+  padding: clamp(36px, 8vh, 92px) 0 48px;
 }
 
 .home-hero-center {
@@ -691,7 +754,7 @@ html, body {
   align-items: center;
   gap: 12px;
   width: 100%;
-  max-width: 620px;
+  max-width: 1240px;
   height: 58px;
   padding: 0 18px;
   border: 1px solid var(--space-border);
@@ -1595,12 +1658,81 @@ html, body {
 .ab-lobby-grid {
   position: relative;
   z-index: 1;
-  display: grid;
-  grid-template-columns: minmax(0, 1.15fr) minmax(360px, 0.85fr);
-  gap: clamp(24px, 5vw, 72px);
+  display: flex;
+  flex-direction: column;
+  gap: 18px;
+  width: 100%;
   max-width: 1240px;
   margin: 0 auto;
-  align-items: center;
+}
+
+.ab-lobby-title {
+  width: 100%;
+  color: var(--text-primary);
+  font-size: clamp(2.4rem, 6vw, 4.5rem);
+  font-weight: 700;
+  letter-spacing: -0.045em;
+  line-height: 1;
+  text-align: center;
+  text-shadow: 0 0 40px rgba(0, 212, 255, 0.2);
+}
+
+.ab-lobby-content {
+  display: grid;
+  grid-template-columns: minmax(240px, 0.75fr) minmax(420px, 1fr);
+  gap: clamp(24px, 5vw, 72px);
+  align-items: start;
+}
+
+.ab-pilot-card {
+  padding: clamp(22px, 3vw, 32px);
+}
+
+.ab-pilot-card h2 {
+  margin-top: 8px;
+  font-size: 24px;
+}
+
+.ab-pilot-rank {
+  display: block;
+  margin-top: 4px;
+  color: var(--glow-cyan);
+  font-family: var(--font-code);
+  font-size: 10px;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+}
+
+.ab-pilot-stats {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 10px;
+  margin-top: 24px;
+}
+
+.ab-pilot-stats div {
+  padding: 12px;
+  border: 1px solid var(--space-border);
+  border-radius: var(--radius-md);
+  background: rgba(7, 9, 15, 0.5);
+}
+
+.ab-pilot-stats strong,
+.ab-pilot-stats span {
+  display: block;
+}
+
+.ab-pilot-stats strong {
+  font-size: 21px;
+}
+
+.ab-pilot-stats span {
+  margin-top: 3px;
+  color: var(--text-muted);
+  font-family: var(--font-code);
+  font-size: 9px;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
 }
 
 .ab-lobby-hero h1 {
@@ -1690,6 +1822,9 @@ html, body {
 }
 
 .ab-lobby-panel {
+  align-self: flex-end;
+  width: min(100%, 620px);
+  margin-left: auto;
   padding: clamp(22px, 3vw, 32px);
 }
 
@@ -3537,9 +3672,15 @@ html, body {
 /* ── Algo Battle responsive ─────────────────────────────────────────────── */
 @media (max-width: 1180px) {
   .ab-lobby-grid {
+    max-width: none;
+  }
+
+  .ab-lobby-content {
     grid-template-columns: 1fr;
-    align-items: start;
-    max-width: 760px;
+  }
+
+  .ab-lobby-panel {
+    width: min(100%, 620px);
   }
 
   .ab-arena-main {

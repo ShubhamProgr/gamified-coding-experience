@@ -31,6 +31,12 @@ import { useSkillTree } from "@/components/skills/useSkillTree";
 import { SKILL_MAP, type SkillId } from "@/components/skills/skillsConfig";
 import SkillUnlockModal from "@/components/skills/SkillUnlockModal";
 import type { LessonLanguage } from "@/components/skills/skillLessons";
+import { useAuth } from "@/components/AuthContext";
+import {
+  getMarsAdventureSave,
+  saveMarsAdventure,
+  type MarsAdventureSave,
+} from "@/lib/api";
 
 // Monaco must be loaded client-side only (no SSR)
 const CodeEditor = dynamic(() => import("@/components/IDE/CodeEditor"), {
@@ -85,8 +91,11 @@ function actionToMessage(action: RoverAction): string {
 }
 
 export default function Home() {
+  const { token } = useAuth();
   const [language, setLanguage] = useState("python");
   const [code, setCode] = useState(DEFAULT_CODES["python"]);
+  const [saveReady, setSaveReady] = useState(!token);
+  const [showOnboarding, setShowOnboarding] = useState(false);
 
   const handleLanguageChange = useCallback((lang: string) => {
     setLanguage(lang);
@@ -121,6 +130,7 @@ export default function Home() {
     resetAll,
     addBuilding,
     syncInventory,
+    hydrate: hydrateRounds,
   } = useRoundManager();
 
   // Compute per-round deposits for the animation hook
@@ -144,6 +154,7 @@ export default function Home() {
     reset,
     totalActions,
     spendInventory,
+    hydrate: hydrateRover,
   } = useRoverAnimation(
     actions,
     currentRoundConfig.radiationZones,
@@ -153,6 +164,101 @@ export default function Home() {
     chargingStations,
     chargingUnlocked
   );
+
+  useEffect(() => {
+    if (!token) {
+      return;
+    }
+
+    let cancelled = false;
+    queueMicrotask(() => {
+      if (!cancelled) setSaveReady(false);
+    });
+    getMarsAdventureSave(token)
+      .then((saved) => {
+        if (cancelled) return;
+        const gameState = saved.game_state;
+        hydrateRounds({
+          currentRound: gameState.currentRound,
+          starsEarned: gameState.starsEarned,
+          cumulativeMinerals: gameState.cumulativeMinerals,
+          persistentBattery: gameState.persistentBattery,
+          persistentInventory: saved.resources,
+          buildings: gameState.buildings,
+        });
+        hydrateRover({
+          ...saved.last_location,
+          battery: gameState.persistentBattery ?? 100,
+          inventory: saved.resources,
+        });
+        setCode(saved.last_code);
+        setShowOnboarding(false);
+        setSaveReady(true);
+      })
+      .catch((error: unknown) => {
+        if (cancelled) return;
+        if (
+          error &&
+          typeof error === "object" &&
+          "status" in error &&
+          typeof error.status === "number" &&
+          error.status !== 404
+        ) {
+          console.error("Could not load Mars Adventure progress.", error);
+        }
+        setShowOnboarding(true);
+        window.setTimeout(() => {
+          if (!cancelled) {
+            setShowOnboarding(false);
+            setSaveReady(true);
+          }
+        }, 1400);
+      });
+
+    return () => {
+      cancelled = true;
+    };
+  }, [token, hydrateRounds, hydrateRover]);
+
+  useEffect(() => {
+    if (!token || !saveReady || showOnboarding) return;
+    const timer = window.setTimeout(() => {
+      const save: MarsAdventureSave = {
+        resources: roverState.inventory,
+        last_location: {
+          col: roverState.col,
+          row: roverState.row,
+          facing: roverState.facing,
+        },
+        last_code: code,
+        game_state: {
+          currentRound: roundState.currentRound,
+          starsEarned: roundState.starsEarned,
+          cumulativeMinerals: roundState.cumulativeMinerals,
+          persistentBattery: roverState.battery,
+          buildings: roundState.buildings,
+        },
+      };
+      saveMarsAdventure(token, save).catch((error: unknown) => {
+        console.error("Could not save Mars Adventure progress.", error);
+      });
+    }, 800);
+    return () => window.clearTimeout(timer);
+  }, [
+    token,
+    saveReady,
+    showOnboarding,
+    code,
+    roverState.col,
+    roverState.row,
+    roverState.facing,
+    roverState.battery,
+    roverState.inventory,
+    roundState.currentRound,
+    roundState.starsEarned,
+    roundState.cumulativeMinerals,
+    roundState.buildings,
+  ]);
 
   // ── Round completion detection ────────────────────────────────────────────
   // Fire once when animation finishes and we haven't already reported this run
@@ -420,6 +526,24 @@ export default function Home() {
         background: "var(--space-bg)",
       }}
     >
+      {showOnboarding && (
+        <div className="mars-onboarding" role="status" aria-live="polite">
+          <div className="mars-onboarding__nodes" aria-hidden="true">
+            {Array.from({ length: 72 }, (_, index) => (
+              <span
+                className="mars-onboarding__node"
+                key={index}
+                style={{ animationDelay: `${(index % 24) * 55}ms` }}
+              />
+            ))}
+          </div>
+          <div className="mars-onboarding__content">
+            <div className="mars-onboarding__eyebrow">MARS ADVENTURE // NEW PILOT</div>
+            <h1>Loading your onboarding experience</h1>
+            <p>Calibrating your rover and preparing the first sector...</p>
+          </div>
+        </div>
+      )}
       {/* Top toolbar */}
       <Toolbar
         isPlaying={isPlaying}

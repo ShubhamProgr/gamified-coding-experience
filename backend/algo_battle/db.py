@@ -184,7 +184,9 @@ def get_rating(user_id: int) -> dict[str, Any]:
                 cur.execute(
                     """
                     SELECT r.user_id, u.username, r.elo_rating, r.matches_played,
-                           r.wins, r.losses, r.rank_tier
+                           r.wins, r.losses, r.rank_tier,
+                           (SELECT COUNT(*) FROM algo_match_participants p
+                            WHERE p.user_id = r.user_id) AS submissions
                     FROM algo_ratings r
                     JOIN users u ON u.id = r.user_id
                     WHERE r.user_id = %s
@@ -205,6 +207,7 @@ def get_rating(user_id: int) -> dict[str, Any]:
         "matches_played": 0,
         "wins": 0,
         "losses": 0,
+        "submissions": 0,
         "rank_tier": "Bronze",
     }
 

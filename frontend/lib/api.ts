@@ -9,6 +9,32 @@ export type AuthSessionResponse = {
   user: AuthUser;
 };
 
+export type MarsAdventureSave = {
+  resources: {
+    cuprion: number;
+    pythorium: number;
+    javium: number;
+  };
+  last_location: {
+    col: number;
+    row: number;
+    facing: "FRONT" | "BACK" | "RIGHT" | "LEFT";
+  };
+  last_code: string;
+  game_state: {
+    currentRound?: number;
+    starsEarned?: number[];
+    cumulativeMinerals?: number;
+    persistentBattery?: number;
+    buildings?: Array<{
+      id: string;
+      type: "charging_station";
+      col: number;
+      row: number;
+    }>;
+  };
+};
+
 type ApiErrorBody = {
   detail?:
     | string
@@ -30,7 +56,7 @@ export class ApiError extends Error {
 }
 
 export type RequestOptions = {
-  method?: "GET" | "POST";
+  method?: "GET" | "POST" | "PUT";
   body?: unknown;
   token?: string;
 };
@@ -98,4 +124,19 @@ export function register(username: string, password: string): Promise<AuthSessio
 
 export function getCurrentUser(token: string): Promise<AuthUser> {
   return request<AuthUser>("/auth/me", { token });
+}
+
+export function getMarsAdventureSave(token: string): Promise<MarsAdventureSave> {
+  return request<MarsAdventureSave>("/games/mars-adventure/save", { token });
+}
+
+export function saveMarsAdventure(
+  token: string,
+  save: MarsAdventureSave
+): Promise<MarsAdventureSave> {
+  return request<MarsAdventureSave>("/games/mars-adventure/save", {
+    method: "PUT",
+    token,
+    body: save,
+  });
 }

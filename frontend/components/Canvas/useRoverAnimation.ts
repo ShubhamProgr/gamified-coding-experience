@@ -474,6 +474,37 @@ export function useRoverAnimation(
     stateRef.current = fresh;
   }, [pause, customDeposits, initialBattery, initialInventory]);
 
+  const hydrate = useCallback(
+    (saved: {
+      col: number;
+      row: number;
+      facing: RoverFacing;
+      battery: number;
+      inventory: RoverInventory;
+    }) => {
+      pause();
+      const restored: RoverState = {
+        ...makeInitialState(customDeposits),
+        col: saved.col,
+        row: saved.row,
+        facing: saved.facing,
+        battery: clamp(saved.battery, 0, 100),
+        inventory: saved.inventory,
+        minerals:
+          saved.inventory.cuprion +
+          saved.inventory.pythorium +
+          saved.inventory.javium,
+      };
+      setIsFinished(false);
+      setProgress(0);
+      setCurrentAction(null);
+      actionIdxRef.current = -1;
+      setState(restored);
+      stateRef.current = restored;
+    },
+    [pause, customDeposits]
+  );
+
   const spendInventory = useCallback(
     (cost: Partial<RoverInventory>): RoverInventory | null => {
       const cur = stateRef.current;
@@ -532,6 +563,7 @@ export function useRoverAnimation(
     pause,
     reset,
     spendInventory,
+    hydrate,
     totalActions: actions.length,
   } as const;
 }

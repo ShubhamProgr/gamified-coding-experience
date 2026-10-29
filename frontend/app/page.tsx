@@ -234,13 +234,6 @@ export default function Home() {
       </div>
       <div className="home-grid" aria-hidden="true" />
 
-      <header className="home-nav">
-        <Link href="/" className="home-brand">
-          <span className="home-brand-mark" aria-hidden="true" />
-          ROVER LAB
-        </Link>
-      </header>
-
       <section className="home-hero">
         <div className="home-hero-center">
           <h1

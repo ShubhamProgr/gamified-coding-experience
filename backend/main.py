@@ -52,7 +52,7 @@ from fastapi import Depends, FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
 from psycopg2.extras import RealDictCursor
-from pydantic import BaseModel, field_validator
+from pydantic import BaseModel, Field, field_validator
 
 # Load local env files when running the backend outside Render.
 for _env_file in (
@@ -238,6 +238,32 @@ def _ensure_users_table() -> None:
         print(f"Warning: could not ensure users table: {exc}")
 
 
+def _ensure_mars_adventure_table() -> None:
+    """Create the per-user Mars Adventure save table."""
+    try:
+        conn = psycopg2.connect(**conn_params)
+        try:
+            with conn.cursor() as cur:
+                cur.execute(
+                    """
+                    CREATE TABLE IF NOT EXISTS "marsAdvData" (
+                        user_id BIGINT PRIMARY KEY REFERENCES users(id) ON DELETE CASCADE,
+                        resources JSONB NOT NULL DEFAULT '{}'::jsonb,
+                        last_location JSONB NOT NULL DEFAULT '{}'::jsonb,
+                        last_code TEXT NOT NULL DEFAULT '',
+                        game_state JSONB NOT NULL DEFAULT '{}'::jsonb,
+                        created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+                        updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+                    )
+                    """
+                )
+            conn.commit()
+        finally:
+            conn.close()
+    except Exception as exc:
+        print(f"Warning: could not ensure Mars Adventure table: {exc}")
+
+
 # ── Schema ─────────────────────────────────────────────────────────────────
 
 SUPPORTED_LANGUAGES = {"python", "cpp", "java"}
@@ -269,6 +295,32 @@ class RunRequest(BaseModel):
 class RunResponse(BaseModel):
     actions: list[dict[str, Any]]
     error: str | None = None
+
+
+class MarsResources(BaseModel):
+    cuprion: int = 0
+    pythorium: int = 0
+    javium: int = 0
+
+
+class MarsLocation(BaseModel):
+    col: int
+    row: int
+    facing: Literal["FRONT", "BACK", "RIGHT", "LEFT"] = "FRONT"
+
+
+class MarsAdventureSave(BaseModel):
+    resources: MarsResources
+    last_location: MarsLocation
+    last_code: str = ""
+    game_state: dict[str, Any] = Field(default_factory=dict)
+
+    @field_validator("last_code")
+    @classmethod
+    def validate_last_code(cls, value: str) -> str:
+        if len(value) > 100_000:
+            raise ValueError("Last code must be at most 100000 characters")
+        return value
 
 
 # ── Safety checks ──────────────────────────────────────────────────────────
@@ -705,11 +757,91 @@ async def auth_me(current_user: dict = Depends(_get_current_user)) -> AuthUser:
     return AuthUser(**current_user)
 
 
+def _get_mars_adventure_save(user_id: int) -> dict[str, Any] | None:
+    conn = psycopg2.connect(**conn_params)
+    try:
+        with conn.cursor(cursor_factory=RealDictCursor) as cur:
+            cur.execute(
+                'SELECT resources, last_location, last_code, game_state, '
+                'created_at, updated_at FROM "marsAdvData" WHERE user_id = %s',
+                (user_id,),
+            )
+            row = cur.fetchone()
+            return dict(row) if row else None
+    finally:
+        conn.close()
+
+
+def _save_mars_adventure(user_id: int, save: MarsAdventureSave) -> dict[str, Any]:
+    conn = psycopg2.connect(**conn_params)
+    try:
+        with conn.cursor(cursor_factory=RealDictCursor) as cur:
+            cur.execute(
+                """
+                INSERT INTO "marsAdvData"
+                    (user_id, resources, last_location, last_code, game_state)
+                VALUES (%s, %s, %s, %s, %s)
+                ON CONFLICT (user_id) DO UPDATE SET
+                    resources = EXCLUDED.resources,
+                    last_location = EXCLUDED.last_location,
+                    last_code = EXCLUDED.last_code,
+                    game_state = EXCLUDED.game_state,
+                    updated_at = NOW()
+                RETURNING resources, last_location, last_code, game_state,
+                          created_at, updated_at
+                """,
+                (
+                    user_id,
+                    json.dumps(save.resources.model_dump()),
+                    json.dumps(save.last_location.model_dump()),
+                    save.last_code,
+                    json.dumps(save.game_state),
+                ),
+            )
+            row = cur.fetchone()
+        conn.commit()
+        return dict(row)
+    finally:
+        conn.close()
+
+
+@app.get("/games/mars-adventure/save", response_model=MarsAdventureSave)
+async def get_mars_adventure_save(
+    current_user: dict = Depends(_get_current_user),
+) -> MarsAdventureSave:
+    """Load the authenticated user's independent Mars Adventure save."""
+    try:
+        save = await asyncio.to_thread(_get_mars_adventure_save, current_user["id"])
+    except Exception as exc:
+        print(f"Warning: could not load Mars Adventure save: {exc}")
+        raise HTTPException(status_code=503, detail="Game save is temporarily unavailable")
+    if save is None:
+        raise HTTPException(status_code=404, detail="No Mars Adventure save found")
+    return MarsAdventureSave(**save)
+
+
+@app.put("/games/mars-adventure/save", response_model=MarsAdventureSave)
+async def put_mars_adventure_save(
+    save: MarsAdventureSave,
+    current_user: dict = Depends(_get_current_user),
+) -> MarsAdventureSave:
+    """Create or update the authenticated user's Mars Adventure save."""
+    try:
+        saved = await asyncio.to_thread(
+            _save_mars_adventure, current_user["id"], save
+        )
+    except Exception as exc:
+        print(f"Warning: could not save Mars Adventure progress: {exc}")
+        raise HTTPException(status_code=503, detail="Game save is temporarily unavailable")
+    return MarsAdventureSave(**saved)
+
+
 # ── Endpoints ──────────────────────────────────────────────────────────────
 
 @app.on_event("startup")
 async def _startup() -> None:
     _ensure_users_table()
+    _ensure_mars_adventure_table()
     from algo_battle import db as algo_battle_db
 
     await asyncio.to_thread(algo_battle_db.initialize)

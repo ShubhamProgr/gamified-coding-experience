@@ -17,10 +17,9 @@ import {
 export default function AlgoBattleLobbyPage() {
   const { user, token } = useAuth();
   const router = useRouter();
-
   const [rating, setRating] = useState<BattleRating | null>(null);
   const [leaders, setLeaders] = useState<BattleRating[]>([]);
-  const [joinCode, setJoinCode] = useState("");
+  const [code, setCode] = useState("");
   const [busy, setBusy] = useState<"quick" | "create" | "join" | null>(null);
   const [error, setError] = useState<string | null>(null);
 
@@ -29,42 +28,30 @@ export default function AlgoBattleLobbyPage() {
     Promise.all([
       token ? getMyRating(token).catch(() => null) : Promise.resolve(null),
       getLeaderboard(8).catch(() => []),
-    ]).then(([myRating, leaderboard]) => {
-      if (cancelled) return;
-      setRating(myRating);
-      setLeaders(leaderboard);
+    ]).then(([nextRating, nextLeaders]) => {
+      if (!cancelled) {
+        setRating(nextRating);
+        setLeaders(nextLeaders);
+      }
     });
     return () => {
       cancelled = true;
     };
   }, [token]);
 
-  const enterRoom = (roomCode: string) => {
+  const enter = (roomCode: string) =>
     router.push(`/algo-battle/${roomCode.toUpperCase()}`);
-  };
 
-  const handleQuickMatch = async () => {
+  const start = async (action: "quick" | "create") => {
     if (!token || busy) return;
-    setBusy("quick");
+    setBusy(action);
     setError(null);
     try {
-      const room = await quickMatch(token);
-      enterRoom(room.roomCode);
+      const room =
+        action === "quick" ? await quickMatch(token) : await createRoom(token);
+      enter(room.roomCode);
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Could not find a match.");
-      setBusy(null);
-    }
-  };
-
-  const handleCreate = async () => {
-    if (!token || busy) return;
-    setBusy("create");
-    setError(null);
-    try {
-      const room = await createRoom(token);
-      enterRoom(room.roomCode);
-    } catch (err) {
-      setError(err instanceof Error ? err.message : "Could not create a room.");
+      setError(err instanceof Error ? err.message : "Could not start a battle.");
       setBusy(null);
     }
   };
@@ -72,16 +59,16 @@ export default function AlgoBattleLobbyPage() {
   const handleJoin = async (event: React.FormEvent) => {
     event.preventDefault();
     if (!token || busy) return;
-    const code = joinCode.trim().toUpperCase();
-    if (code.length !== 6) {
-      setError("Room codes are 6 characters long.");
+    const roomCode = code.trim().toUpperCase();
+    if (roomCode.length !== 6) {
+      setError("Enter a 6-character room code.");
       return;
     }
     setBusy("join");
     setError(null);
     try {
-      await joinRoom(token, code);
-      enterRoom(code);
+      await joinRoom(token, roomCode);
+      enter(roomCode);
     } catch (err) {
       setError(err instanceof Error ? err.message : "Could not join that room.");
       setBusy(null);
@@ -90,72 +77,34 @@ export default function AlgoBattleLobbyPage() {
 
   return (
     <main className="ab-lobby">
-      <div className="ab-lobby-bg" aria-hidden="true">
-        <span className="ab-orbit ab-orbit--one" />
-        <span className="ab-orbit ab-orbit--two" />
-        <span className="ab-glow ab-glow--cyan" />
-        <span className="ab-glow ab-glow--orange" />
-      </div>
-
       <div className="ab-lobby-grid">
-        <section className="ab-lobby-hero">
-          <span className="ab-eyebrow">GAME 02 · REAL-TIME DUEL</span>
-          <h1>
-            ALGO
-            <span>BATTLE</span>
-          </h1>
-          <p className="ab-lobby-lede">
-            Two coders. One problem. The fastest, leanest algorithm lands the
-            killing blow. CPU time becomes attack power, peak memory becomes a
-            shield, and every failed test costs HP.
-          </p>
-
-          <div className="ab-lobby-stats">
-            <article>
-              <strong>{rating ? rating.elo_rating : "1200"}</strong>
-              <span>{rating ? `${rating.rank_tier} MMR` : "starting MMR"}</span>
-            </article>
-            <article>
-              <strong>{rating ? rating.wins : 0}</strong>
-              <span>duels won</span>
-            </article>
-            <article>
-              <strong>{rating ? rating.matches_played : 0}</strong>
-              <span>matches played</span>
-            </article>
-          </div>
-
-          <div className="ab-lobby-steps">
-            <div>
-              <span>01</span>
-              <p>Get the same algorithm problem as your opponent.</p>
-            </div>
-            <div>
-              <span>02</span>
-              <p>Run sample tests, then lock in your best solution.</p>
-            </div>
-            <div>
-              <span>03</span>
-              <p>Watch time, memory and Big-O decide the winner.</p>
-            </div>
-          </div>
-        </section>
-
-        <section className="ab-lobby-panel glass-panel glass-panel--glow">
+        <h1 className="ab-lobby-title">Algo Battle</h1>
+        <div className="ab-lobby-content">
+          {user && (
+            <section className="ab-pilot-card glass-panel">
+              <span className="ab-eyebrow">PILOT INFO</span>
+              <h2>{user.username}</h2>
+              <span className="ab-pilot-rank">{rating?.rank_tier ?? "Bronze"} pilot</span>
+              <div className="ab-pilot-stats">
+                <div><strong>{rating?.matches_played ?? 0}</strong><span>Matches</span></div>
+                <div><strong>{rating?.wins ?? 0}</strong><span>Won</span></div>
+                <div><strong>{rating?.losses ?? 0}</strong><span>Lost</span></div>
+                <div><strong>{rating?.submissions ?? 0}</strong><span>Submissions</span></div>
+              </div>
+            </section>
+          )}
+          <section className="ab-lobby-panel glass-panel glass-panel--glow">
           {!user ? (
             <div className="ab-lobby-auth">
-              <span className="ab-eyebrow">PILOT REQUIRED</span>
-              <h2>Sign in to enter the arena</h2>
-              <p>
-                Your Rover Lab account carries your Algo Battle rating, win
-                record and rank tier.
-              </p>
+              <span className="ab-eyebrow">READY?</span>
+              <h2>Sign in to play</h2>
+              <p>Create a room or join a friend after signing in.</p>
               <div className="ab-lobby-auth-actions">
-                <Link href="/login?next=/algo-battle" className="ab-btn ab-btn--primary">
+                <Link className="ab-btn ab-btn--primary" href="/login?next=/algo-battle">
                   Sign in
                 </Link>
-                <Link href="/register?next=/algo-battle" className="ab-btn ab-btn--ghost">
-                  Create account
+                <Link className="ab-btn ab-btn--ghost" href="/register?next=/algo-battle">
+                  Register
                 </Link>
               </div>
             </div>
@@ -163,71 +112,50 @@ export default function AlgoBattleLobbyPage() {
             <>
               <div className="ab-lobby-panel-head">
                 <div>
-                  <span className="ab-eyebrow">MATCHMAKING</span>
-                  <h2>Find your opponent</h2>
+                  <span className="ab-eyebrow">WELCOME, {user.username}</span>
+                  <h2>Start a battle</h2>
                 </div>
-                <span className="ab-online-pill">
-                  <i />
-                  {user.username}
-                </span>
               </div>
-
               {error && <p className="ab-lobby-error">{error}</p>}
-
               <button
                 type="button"
                 className="ab-quick-match"
-                onClick={handleQuickMatch}
+                onClick={() => start("quick")}
                 disabled={busy !== null}
               >
                 <span className="ab-quick-icon">VS</span>
                 <span>
-                  <strong>
-                    {busy === "quick" ? "Searching…" : "Quick match"}
-                  </strong>
-                  <em>Pair with the next available coder</em>
+                  <strong>{busy === "quick" ? "Finding player…" : "Quick match"}</strong>
+                  <em>Play against the next available coder</em>
                 </span>
-                <b>{busy === "quick" ? "···" : "→"}</b>
+                <b>→</b>
               </button>
-
-              <div className="ab-lobby-divider">
-                <span />
-                or duel a friend
-                <span />
-              </div>
-
+              <div className="ab-lobby-divider"><span />or<span /></div>
               <button
                 type="button"
                 className="ab-btn ab-btn--ghost ab-lobby-create"
-                onClick={handleCreate}
+                onClick={() => start("create")}
                 disabled={busy !== null}
               >
-                {busy === "create" ? "Creating room…" : "Create private room"}
+                {busy === "create" ? "Creating…" : "Create private room"}
               </button>
-
               <form className="ab-join-form" onSubmit={handleJoin}>
-                <label htmlFor="room-code">Join with room code</label>
+                <label htmlFor="room-code">Join with code</label>
                 <div>
                   <input
                     id="room-code"
-                    value={joinCode}
+                    value={code}
                     onChange={(event) =>
-                      setJoinCode(
-                        event.target.value
-                          .replace(/[^a-zA-Z0-9]/g, "")
-                          .slice(0, 6)
-                          .toUpperCase()
-                      )
+                      setCode(event.target.value.replace(/[^a-z0-9]/gi, "").slice(0, 6).toUpperCase())
                     }
                     placeholder="A1B2C3"
                     maxLength={6}
                     autoComplete="off"
-                    spellCheck={false}
                   />
                   <button
                     type="submit"
                     className="ab-btn ab-btn--primary"
-                    disabled={busy !== null || joinCode.length !== 6}
+                    disabled={busy !== null || code.length !== 6}
                   >
                     {busy === "join" ? "Joining…" : "Join"}
                   </button>
@@ -235,39 +163,29 @@ export default function AlgoBattleLobbyPage() {
               </form>
             </>
           )}
-        </section>
+          </section>
+        </div>
       </div>
 
       <section className="ab-leaderboard">
         <div className="ab-leaderboard-head">
           <div>
-            <span className="ab-eyebrow">SEASON RANKINGS</span>
-            <h2>Top duelists</h2>
+            <span className="ab-eyebrow">LEADERBOARD</span>
+            <h2>Top coders</h2>
           </div>
-          <span>Elo updates after every match</span>
+          <span>Updated after each match</span>
         </div>
-
-        {leaders.length === 0 ? (
-          <p className="ab-leaderboard-empty">
-            No rated duelists yet. Win the first match and claim the top spot.
-          </p>
-        ) : (
-          <div className="ab-leaderboard-list">
-            {leaders.map((entry, index) => (
-              <article key={entry.user_id}>
-                <span className="ab-rank">#{index + 1}</span>
-                <strong>{entry.username ?? `Player ${entry.user_id}`}</strong>
-                <span className={`ab-tier ab-tier--${entry.rank_tier.toLowerCase()}`}>
-                  {entry.rank_tier}
-                </span>
-                <em>{entry.elo_rating} MMR</em>
-                <small>
-                  {entry.wins}W · {entry.losses}L
-                </small>
-              </article>
-            ))}
-          </div>
-        )}
+        <div className="ab-leaderboard-list">
+          {leaders.map((entry, index) => (
+            <article key={entry.user_id}>
+              <span className="ab-rank">#{index + 1}</span>
+              <strong>{entry.username ?? `Player ${entry.user_id}`}</strong>
+              <span className="ab-tier">{entry.rank_tier}</span>
+              <em>{entry.elo_rating} MMR</em>
+              <small>{entry.wins}W · {entry.losses}L</small>
+            </article>
+          ))}
+        </div>
       </section>
     </main>
   );

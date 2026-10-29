@@ -5,7 +5,7 @@ const nextConfig: NextConfig = {
   env: {
     BACKEND_RENDER_URL:
       process.env.BACKEND_RENDER_URL ||
-      "https://gamified-coding-experience.onrender.com",
+      "http://localhost:8000",
   },
 };
 

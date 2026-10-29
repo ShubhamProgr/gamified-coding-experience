@@ -76,59 +76,42 @@ def ensure_schema() -> None:
             )
             cur.execute(
                 """
-                CREATE TABLE IF NOT EXISTS algo_matches (
-                    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-                    room_code VARCHAR(16) UNIQUE NOT NULL,
-                    problem_id VARCHAR(64) REFERENCES algo_problems(id),
-                    status VARCHAR(24) DEFAULT 'WAITING',
-                    winner_id BIGINT REFERENCES users(id) ON DELETE SET NULL,
-                    started_at TIMESTAMP WITH TIME ZONE,
-                    finished_at TIMESTAMP WITH TIME ZONE,
-                    created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
-                )
-                """
-            )
-            cur.execute(
-                "ALTER TABLE algo_matches ADD COLUMN IF NOT EXISTS "
-                "started_at TIMESTAMP WITH TIME ZONE"
-            )
-            cur.execute(
-                "ALTER TABLE algo_matches ADD COLUMN IF NOT EXISTS "
-                "finished_at TIMESTAMP WITH TIME ZONE"
-            )
-            cur.execute(
-                """
-                CREATE TABLE IF NOT EXISTS algo_match_participants (
-                    match_id UUID REFERENCES algo_matches(id) ON DELETE CASCADE,
-                    user_id BIGINT REFERENCES users(id) ON DELETE CASCADE,
-                    language VARCHAR(24) NOT NULL,
-                    code TEXT,
-                    tests_passed INTEGER DEFAULT 0,
-                    total_tests INTEGER DEFAULT 0,
-                    cpu_time_ms FLOAT,
-                    peak_memory_kb FLOAT,
-                    submitted_at TIMESTAMP WITH TIME ZONE,
-                    PRIMARY KEY (match_id, user_id)
-                )
-                """
-            )
-            cur.execute(
-                """
-                CREATE TABLE IF NOT EXISTS algo_ratings (
+                CREATE TABLE IF NOT EXISTS "algoBattleData" (
                     user_id BIGINT PRIMARY KEY REFERENCES users(id) ON DELETE CASCADE,
-                    elo_rating INTEGER DEFAULT 1200,
-                    matches_played INTEGER DEFAULT 0,
-                    wins INTEGER DEFAULT 0,
-                    losses INTEGER DEFAULT 0,
-                    rank_tier VARCHAR(24) DEFAULT 'Bronze',
-                    updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+                    elo_rating INTEGER NOT NULL DEFAULT 1200,
+                    matches_played INTEGER NOT NULL DEFAULT 0,
+                    wins INTEGER NOT NULL DEFAULT 0,
+                    losses INTEGER NOT NULL DEFAULT 0,
+                    submissions INTEGER NOT NULL DEFAULT 0,
+                    rank_tier VARCHAR(24) NOT NULL DEFAULT 'Bronze',
+                    match_history JSONB NOT NULL DEFAULT '[]'::jsonb,
+                    created_at TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT NOW(),
+                    updated_at TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT NOW()
                 )
                 """
             )
             cur.execute(
-                "CREATE INDEX IF NOT EXISTS algo_ratings_elo_idx "
-                "ON algo_ratings (elo_rating DESC)"
+                'CREATE INDEX IF NOT EXISTS "algoBattleData_elo_idx" '
+                'ON "algoBattleData" (elo_rating DESC)'
             )
+            cur.execute(
+                "SELECT EXISTS ("
+                "SELECT 1 FROM information_schema.tables "
+                "WHERE table_schema = current_schema() AND table_name = 'algo_ratings'"
+                ")"
+            )
+            if cur.fetchone()[0]:
+                cur.execute(
+                    """
+                    INSERT INTO "algoBattleData"
+                        (user_id, elo_rating, matches_played, wins, losses,
+                         rank_tier, submissions)
+                    SELECT user_id, elo_rating, matches_played, wins, losses,
+                           rank_tier, 0
+                    FROM algo_ratings
+                    ON CONFLICT (user_id) DO NOTHING
+                    """
+                )
         conn.commit()
     finally:
         conn.close()
@@ -184,10 +167,8 @@ def get_rating(user_id: int) -> dict[str, Any]:
                 cur.execute(
                     """
                     SELECT r.user_id, u.username, r.elo_rating, r.matches_played,
-                           r.wins, r.losses, r.rank_tier,
-                           (SELECT COUNT(*) FROM algo_match_participants p
-                            WHERE p.user_id = r.user_id) AS submissions
-                    FROM algo_ratings r
+                           r.wins, r.losses, r.rank_tier, r.submissions
+                    FROM "algoBattleData" r
                     JOIN users u ON u.id = r.user_id
                     WHERE r.user_id = %s
                     """,
@@ -221,7 +202,7 @@ def leaderboard(limit: int = 10) -> list[dict[str, Any]]:
                     """
                     SELECT r.user_id, u.username, r.elo_rating, r.matches_played,
                            r.wins, r.losses, r.rank_tier
-                    FROM algo_ratings r
+                    FROM "algoBattleData" r
                     JOIN users u ON u.id = r.user_id
                     ORDER BY r.elo_rating DESC, r.wins DESC
                     LIMIT %s
@@ -256,36 +237,20 @@ def record_match(
 
     try:
         with conn.cursor(cursor_factory=RealDictCursor) as cur:
-            winner_id = result.get("winner_id")
-            cur.execute(
-                """
-                INSERT INTO algo_matches
-                    (room_code, problem_id, status, winner_id, started_at, finished_at)
-                VALUES (%s, %s, 'FINISHED', %s, %s, NOW())
-                ON CONFLICT (room_code) DO UPDATE SET
-                    status = 'FINISHED',
-                    winner_id = EXCLUDED.winner_id,
-                    finished_at = NOW()
-                RETURNING id, created_at
-                """,
-                (room_code, problem.id, winner_id, started_at),
-            )
-            match_row = cur.fetchone()
-            match_id = match_row["id"]
-
             ratings: dict[int, int] = {}
             for player in (p1, p2):
                 user_id = player["user_id"]
                 cur.execute(
                     """
-                    INSERT INTO algo_ratings (user_id, elo_rating, rank_tier)
-                    VALUES (%s, %s, %s)
+                    INSERT INTO "algoBattleData" (user_id, rank_tier)
+                    VALUES (%s, %s)
                     ON CONFLICT (user_id) DO NOTHING
                     """,
-                    (user_id, DEFAULT_RATING, "Bronze"),
+                    (user_id, "Bronze"),
                 )
                 cur.execute(
-                    "SELECT elo_rating FROM algo_ratings WHERE user_id = %s",
+                    'SELECT elo_rating FROM "algoBattleData" '
+                    "WHERE user_id = %s FOR UPDATE",
                     (user_id,),
                 )
                 ratings[user_id] = cur.fetchone()["elo_rating"]
@@ -302,12 +267,13 @@ def record_match(
                 losses = 1 if winner_side != "draw" and player["side"] != winner_side else 0
                 cur.execute(
                     """
-                    UPDATE algo_ratings SET
+                    UPDATE "algoBattleData" SET
                         elo_rating = %s,
                         matches_played = matches_played + 1,
                         wins = wins + %s,
                         losses = losses + %s,
                         rank_tier = %s,
+                        submissions = submissions + 1,
                         updated_at = NOW()
                     WHERE user_id = %s
                     """,
@@ -320,33 +286,25 @@ def record_match(
                     "rank_tier": _rank_tier(new_rating),
                 }
 
+            match_record = {
+                "room_code": room_code,
+                "problem_id": problem.id,
+                "winner": winner_side,
+                "winner_id": result.get("winner_id"),
+                "started_at": started_at,
+                "finished_at": result.get("evaluated_at"),
+                "players": [p1, p2],
+                "combat_log": result.get("combatLog", []),
+            }
             for player in (p1, p2):
                 cur.execute(
                     """
-                    INSERT INTO algo_match_participants
-                        (match_id, user_id, language, code, tests_passed, total_tests,
-                         cpu_time_ms, peak_memory_kb, submitted_at)
-                    VALUES (%s, %s, %s, %s, %s, %s, %s, %s, to_timestamp(%s))
-                    ON CONFLICT (match_id, user_id) DO UPDATE SET
-                        language = EXCLUDED.language,
-                        code = EXCLUDED.code,
-                        tests_passed = EXCLUDED.tests_passed,
-                        total_tests = EXCLUDED.total_tests,
-                        cpu_time_ms = EXCLUDED.cpu_time_ms,
-                        peak_memory_kb = EXCLUDED.peak_memory_kb,
-                        submitted_at = EXCLUDED.submitted_at
+                    UPDATE "algoBattleData"
+                    SET match_history = match_history || %s::jsonb,
+                        updated_at = NOW()
+                    WHERE user_id = %s
                     """,
-                    (
-                        match_id,
-                        player["user_id"],
-                        player["language"],
-                        player["code"],
-                        player["passed_count"],
-                        player["total_count"],
-                        player["time_ms"],
-                        player["memory_kb"],
-                        player.get("submitted_at"),
-                    ),
+                    (Json([match_record]), player["user_id"]),
                 )
         conn.commit()
     except Exception as exc:  # pragma: no cover

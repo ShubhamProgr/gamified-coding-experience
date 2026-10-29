@@ -6,6 +6,12 @@ import { useRouter } from "next/navigation";
 import { useAuth } from "@/components/AuthContext";
 import { validatePassword, validateUsername } from "@/lib/validation";
 
+function getNextPath() {
+  if (typeof window === "undefined") return "/";
+  const next = new URLSearchParams(window.location.search).get("next");
+  return next && next.startsWith("/") && !next.startsWith("//") ? next : "/";
+}
+
 interface SignupForm {
   username: string;
   password: string;
@@ -25,7 +31,7 @@ export default function RegisterPage() {
 
   useEffect(() => {
     if (user) {
-      router.replace("/");
+      router.replace(getNextPath());
     }
   }, [user, router]);
 
@@ -46,7 +52,7 @@ export default function RegisterPage() {
     setSubmitting(true);
     try {
       await register(form.username.trim(), form.password);
-      router.replace("/");
+      router.replace(getNextPath());
     } catch (err: unknown) {
       setError(err instanceof Error ? err.message : "Registration failed.");
     } finally {

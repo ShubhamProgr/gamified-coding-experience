@@ -29,6 +29,7 @@ Extensibility
 """
 
 import ast
+import asyncio
 import base64
 import hashlib
 import hmac
@@ -78,6 +79,11 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
+
+# ── Algo Battle game router ────────────────────────────────────────────────
+from algo_battle.router import router as algo_battle_router  # noqa: E402
+
+app.include_router(algo_battle_router)
 
 # Absolute path to the rover_sdk package directory
 SDK_DIR = Path(__file__).parent / "rover_sdk"
@@ -704,6 +710,9 @@ async def auth_me(current_user: dict = Depends(_get_current_user)) -> AuthUser:
 @app.on_event("startup")
 async def _startup() -> None:
     _ensure_users_table()
+    from algo_battle import db as algo_battle_db
+
+    await asyncio.to_thread(algo_battle_db.initialize)
 
 
 @app.get("/")
@@ -719,6 +728,12 @@ async def root() -> dict:
                 "signup": "POST /auth/signup",
                 "login": "POST /auth/login",
                 "me": "GET /auth/me",
+            },
+            "algo_battle": {
+                "quick_match": "POST /algo-battle/quick-match",
+                "create_room": "POST /algo-battle/rooms",
+                "leaderboard": "GET /algo-battle/leaderboard",
+                "socket": "WS /ws/algo-battle/{room_code}",
             },
         },
     }

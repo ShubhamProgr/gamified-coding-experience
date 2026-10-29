@@ -6,6 +6,12 @@ import { useRouter } from "next/navigation";
 import { useAuth } from "@/components/AuthContext";
 import { validatePassword, validateUsername } from "@/lib/validation";
 
+function getNextPath() {
+  if (typeof window === "undefined") return "/";
+  const next = new URLSearchParams(window.location.search).get("next");
+  return next && next.startsWith("/") && !next.startsWith("//") ? next : "/";
+}
+
 interface LoginForm {
   username: string;
   password: string;
@@ -20,7 +26,7 @@ export default function LoginPage() {
 
   useEffect(() => {
     if (user) {
-      router.replace("/");
+      router.replace(getNextPath());
     }
   }, [user, router]);
 
@@ -37,7 +43,7 @@ export default function LoginPage() {
     setSubmitting(true);
     try {
       await login(form.username.trim(), form.password);
-      router.replace("/");
+      router.replace(getNextPath());
     } catch (err: unknown) {
       setError(err instanceof Error ? err.message : "Login failed.");
     } finally {

@@ -29,7 +29,7 @@ export class ApiError extends Error {
   }
 }
 
-type RequestOptions = {
+export type RequestOptions = {
   method?: "GET" | "POST";
   body?: unknown;
   token?: string;
@@ -79,6 +79,8 @@ async function request<T>(path: string, options: RequestOptions = {}): Promise<T
 
   return data as T;
 }
+
+export { request as apiRequest };
 
 export function login(username: string, password: string): Promise<AuthSessionResponse> {
   return request<AuthSessionResponse>("/auth/login", {

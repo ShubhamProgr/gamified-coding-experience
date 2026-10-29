@@ -1,2 +1,6 @@
 # Ignore implementation plan
 IMPLEMENTATION_PLAN.md
+
+# Python bytecode
+__pycache__/
+*.pyc

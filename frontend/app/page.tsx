@@ -20,7 +20,8 @@ const CLOUDINARY_CLOUD_NAME =
 const THUMBNAIL_PUBLIC_IDS = {
   roverAdventure:
     "https://res.cloudinary.com/ikjuljmm/image/upload/v1793025165/marsRoverThumbnail.png",
-  slot1: "",
+  algoBattle:
+    "https://res.cloudinary.com/ikjuljmm/image/upload/v1793258845/algoBattleThumbnail.png",
   slot2: "",
 };
 
@@ -65,13 +66,13 @@ const GAMES: Game[] = [
       "/rover-adventure.png",
   },
   {
-    id: "placeholder-1",
-    title: "Coming Soon",
-    description: "",
-    href: "#",
-    tags: [],
-    image: cloudinaryThumbnail(THUMBNAIL_PUBLIC_IDS.slot1),
-    placeholder: true,
+    id: "algo-battle",
+    title: "Algo Battle",
+    description:
+      "Face another coder in a live 1v1 duel. Turn CPU time into attack power, memory into shields, and the fastest algorithm into victory.",
+    href: "/algo-battle",
+    tags: ["1v1", "Duel", "Python", "Java", "C++", "Algorithms", "Multiplayer"],
+    image: cloudinaryThumbnail(THUMBNAIL_PUBLIC_IDS.algoBattle),
   },
   {
     id: "placeholder-2",
@@ -396,12 +397,30 @@ export default function Home() {
               ) : (
                 <Link key={game.id} href={game.href} className="game-card">
                   <div className="game-card-media">
-                    <div className="game-card-art" aria-hidden="true">
-                      <span className="game-card-planet" />
-                      <span className="game-card-terrain" />
-                      <span className="game-card-rover" />
+                    <div
+                      className={`game-card-art${
+                        game.id === "algo-battle"
+                          ? " game-card-art--algo"
+                          : ""
+                      }`}
+                      aria-hidden="true"
+                    >
+                      {game.id === "algo-battle" ? (
+                        <>
+                          <span className="game-card-duelist game-card-duelist--left" />
+                          <span className="game-card-duelist game-card-duelist--right" />
+                          <span className="game-card-clash" />
+                          <span className="game-card-grid" />
+                        </>
+                      ) : (
+                        <>
+                          <span className="game-card-planet" />
+                          <span className="game-card-terrain" />
+                          <span className="game-card-rover" />
+                        </>
+                      )}
                     </div>
-                    {!failedImages[game.id] && (
+                    {game.image && !failedImages[game.id] && (
                       // eslint-disable-next-line @next/next/no-img-element
                       <img
                         src={game.image}

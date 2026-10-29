@@ -438,15 +438,6 @@ function drawTile(
     ctx.restore();
   }
 
-  // Coordinate label
-  ctx.save();
-  ctx.font = "600 7px 'Fira Code', monospace";
-  ctx.fillStyle = highlight ? "rgba(0,212,255,0.85)" : "rgba(255,255,255,0.22)";
-  ctx.textAlign = "center";
-  ctx.textBaseline = "middle";
-  ctx.fillText(`${col},${row}`, sx + hw, sy - hh + 9);
-  ctx.restore();
-
   // Left face
   ctx.beginPath();
   ctx.moveTo(sx, sy);
@@ -1090,9 +1081,7 @@ export default function IsometricGrid({
           pointerEvents: "none",
         }}
       >
-        <span>
-          ({roverState.col}, {roverState.row}) · {roverState.facing}
-        </span>
+        <span>{roverState.facing}</span>
         {currentTileDeposit && !currentTileDeposit.depleted && (
           <span
             style={{

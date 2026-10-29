@@ -1,6 +1,7 @@
 export const GRID_SIZE = 15;
 
-export const START_CELL = { col: 0, row: 0 } as const;
+// Center of the 15×15 grid (floor(GRID_SIZE / 2)).
+export const START_CELL = { col: 7, row: 7 } as const;
 
 // Irregular, asymmetric landmass — a jagged continent with a northern spur,
 // a long western arm, an eastern headland, and a southern tail. Internal

@@ -65,7 +65,11 @@ for _env_file in (
 
 app = FastAPI(title="Mars Rover API", version="1.0.0")
 
-cors_origins = [origin.strip() for origin in os.getenv("ALLOWED_ORIGINS", "*").split(",") if origin.strip()]
+cors_origins = [
+    origin.strip().rstrip("/")
+    for origin in os.getenv("ALLOWED_ORIGINS", "*").split(",")
+    if origin.strip()
+] or ["*"]
 
 app.add_middleware(
     CORSMiddleware,

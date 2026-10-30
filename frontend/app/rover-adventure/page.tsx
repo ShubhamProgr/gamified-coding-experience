@@ -95,7 +95,6 @@ export default function Home() {
   const [language, setLanguage] = useState("python");
   const [code, setCode] = useState(DEFAULT_CODES["python"]);
   const [saveReady, setSaveReady] = useState(!token);
-  const [showOnboarding, setShowOnboarding] = useState(false);
 
   const handleLanguageChange = useCallback((lang: string) => {
     setLanguage(lang);
@@ -192,27 +191,23 @@ export default function Home() {
           inventory: saved.resources,
         });
         setCode(saved.last_code);
-        setShowOnboarding(false);
         setSaveReady(true);
       })
       .catch((error: unknown) => {
         if (cancelled) return;
-        if (
+        const isMissingSave =
           error &&
           typeof error === "object" &&
           "status" in error &&
           typeof error.status === "number" &&
-          error.status !== 404
-        ) {
+          error.status === 404;
+        if (!isMissingSave) {
           console.error("Could not load Mars Adventure progress.", error);
+          return;
         }
-        setShowOnboarding(true);
-        window.setTimeout(() => {
-          if (!cancelled) {
-            setShowOnboarding(false);
-            setSaveReady(true);
-          }
-        }, 1400);
+        // A missing save is a new game. Enable autosave so the default state
+        // is inserted into marsAdvData without blocking the game behind a popup.
+        setSaveReady(true);
       });
 
     return () => {
@@ -221,7 +216,7 @@ export default function Home() {
   }, [token, hydrateRounds, hydrateRover]);
 
   useEffect(() => {
-    if (!token || !saveReady || showOnboarding) return;
+    if (!token || !saveReady) return;
     const timer = window.setTimeout(() => {
       const save: MarsAdventureSave = {
         resources: roverState.inventory,
@@ -247,7 +242,6 @@ export default function Home() {
   }, [
     token,
     saveReady,
-    showOnboarding,
     code,
     roverState.col,
     roverState.row,
@@ -526,24 +520,6 @@ export default function Home() {
         background: "var(--space-bg)",
       }}
     >
-      {showOnboarding && (
-        <div className="mars-onboarding" role="status" aria-live="polite">
-          <div className="mars-onboarding__nodes" aria-hidden="true">
-            {Array.from({ length: 72 }, (_, index) => (
-              <span
-                className="mars-onboarding__node"
-                key={index}
-                style={{ animationDelay: `${(index % 24) * 55}ms` }}
-              />
-            ))}
-          </div>
-          <div className="mars-onboarding__content">
-            <div className="mars-onboarding__eyebrow">MARS ADVENTURE // NEW PILOT</div>
-            <h1>Loading your onboarding experience</h1>
-            <p>Calibrating your rover and preparing the first sector...</p>
-          </div>
-        </div>
-      )}
       {/* Top toolbar */}
       <Toolbar
         isPlaying={isPlaying}

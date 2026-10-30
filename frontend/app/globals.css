@@ -218,69 +218,6 @@ html, body {
   to   { opacity: 1; transform: scale(1); }
 }
 
-@keyframes onboarding-node-fill {
-  0%, 100% { opacity: 0.12; transform: scale(0.7); }
-  45% { opacity: 1; transform: scale(1); box-shadow: 0 0 14px var(--glow-cyan); }
-}
-
-.mars-onboarding {
-  position: fixed;
-  inset: 0;
-  z-index: 100;
-  display: grid;
-  place-items: center;
-  overflow: hidden;
-  background: rgba(3, 6, 12, 0.98);
-}
-
-.mars-onboarding__nodes {
-  position: absolute;
-  inset: 8%;
-  display: grid;
-  grid-template-columns: repeat(12, 1fr);
-  gap: clamp(12px, 2vw, 28px);
-  transform: perspective(600px) rotateX(18deg);
-}
-
-.mars-onboarding__node {
-  width: 5px;
-  height: 5px;
-  justify-self: center;
-  align-self: center;
-  border-radius: 50%;
-  background: var(--glow-cyan);
-  animation: onboarding-node-fill 1.4s ease-in-out infinite;
-}
-
-.mars-onboarding__content {
-  position: relative;
-  max-width: 560px;
-  padding: 36px;
-  text-align: center;
-  background: rgba(13, 17, 23, 0.8);
-  border: 1px solid var(--space-border-glow);
-  border-radius: var(--radius-lg);
-  box-shadow: 0 0 55px rgba(0, 212, 255, 0.18);
-}
-
-.mars-onboarding__eyebrow {
-  margin-bottom: 14px;
-  color: var(--glow-cyan);
-  font-family: var(--font-code);
-  font-size: 11px;
-  letter-spacing: 0.16em;
-}
-
-.mars-onboarding h1 {
-  font-size: clamp(22px, 3vw, 34px);
-  font-weight: 500;
-}
-
-.mars-onboarding p {
-  margin-top: 12px;
-  color: var(--text-secondary);
-}
-
 @keyframes victory-in {
   from { opacity: 0; transform: scale(0.7) translateY(30px); }
   to   { opacity: 1; transform: scale(1) translateY(0); }

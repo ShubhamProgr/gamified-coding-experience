@@ -16,6 +16,16 @@ bun dev
 
 Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
 
+## Backend URL
+
+The frontend resolves the backend dynamically:
+
+- Local development defaults to `http://localhost:8000`.
+- Production defaults to the deployed Render API.
+- Set `NEXT_PUBLIC_BACKEND_URL` in the deployment environment to override the production API URL.
+
+For local development, set `BACKEND_RENDER_URL=http://localhost:8000` in `.env.local`. Do not commit environment files.
+
 You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
 
 This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.

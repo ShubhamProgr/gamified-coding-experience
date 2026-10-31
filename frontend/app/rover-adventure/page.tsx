@@ -35,6 +35,7 @@ import { useAuth } from "@/components/AuthContext";
 import {
   getMarsAdventureSave,
   saveMarsAdventure,
+  getBackendApiUrl,
   type MarsAdventureSave,
 } from "@/lib/api";
 
@@ -70,9 +71,6 @@ const CodeEditor = dynamic(() => import("@/components/IDE/CodeEditor"), {
   ),
 });
 
-const API_URL = process.env.BACKEND_RENDER_URL ?? "http://localhost:8000";
-
-
 function makeId() {
   return Math.random().toString(36).slice(2);
 }
@@ -91,12 +89,14 @@ function actionToMessage(action: RoverAction): string {
 }
 
 export default function Home() {
-  const { token } = useAuth();
+  const { token, user } = useAuth();
   const [language, setLanguage] = useState("python");
   const [code, setCode] = useState(DEFAULT_CODES["python"]);
   const [saveReady, setSaveReady] = useState(!token);
   const [saveStatus, setSaveStatus] = useState<"saved" | "saving">("saved");
   const [showTour, setShowTour] = useState(false);
+  const [hasSeenTour, setHasSeenTour] = useState(false);
+  const tourSeenStorageKey = user ? `mars_adventure_tour_seen_user_${user.id}` : "mars_adventure_tour_seen";
 
   const handleLanguageChange = useCallback((lang: string) => {
     setLanguage(lang);
@@ -197,15 +197,16 @@ export default function Home() {
             setCode(saved.last_code || DEFAULT_CODES[gameState.language ?? "python"]);
           });
           hydrateSkills(gameState.unlockedSkills, gameState.skillMinerals);
-          if (!gameState.hasSeenTour && !localStorage.getItem("mars_adventure_tour_seen")) {
-            window.setTimeout(() => setShowTour(true), 800);
+          queueMicrotask(() => setHasSeenTour(Boolean(gameState.hasSeenTour || localStorage.getItem(tourSeenStorageKey))));
+          if (!gameState.hasSeenTour && !localStorage.getItem(tourSeenStorageKey)) {
+            window.requestAnimationFrame(() => setShowTour(true));
           }
         } catch (error) {
           console.error("Could not load guest Mars Adventure progress.", error);
         }
       }
-      if (!raw && !localStorage.getItem("mars_adventure_tour_seen")) {
-        window.setTimeout(() => setShowTour(true), 800);
+      if (!raw && !localStorage.getItem(tourSeenStorageKey)) {
+        window.requestAnimationFrame(() => setShowTour(true));
       }
       return;
     }
@@ -238,8 +239,9 @@ export default function Home() {
           setCode(saved.last_code || DEFAULT_CODES[gameState.language ?? "python"]);
         });
         hydrateSkills(gameState.unlockedSkills, gameState.skillMinerals);
-        if (!gameState.hasSeenTour && !localStorage.getItem("mars_adventure_tour_seen")) {
-          window.setTimeout(() => setShowTour(true), 800);
+        setHasSeenTour(Boolean(gameState.hasSeenTour || localStorage.getItem(tourSeenStorageKey)));
+        if (!gameState.hasSeenTour && !localStorage.getItem(tourSeenStorageKey)) {
+          window.requestAnimationFrame(() => setShowTour(true));
         }
         setSaveReady(true);
       })
@@ -282,6 +284,10 @@ export default function Home() {
               setCode(parsedGuestSave.last_code || DEFAULT_CODES[guestGameState.language ?? "python"]);
             });
             hydrateSkills(guestGameState.unlockedSkills, guestGameState.skillMinerals);
+            setHasSeenTour(Boolean(guestGameState.hasSeenTour || localStorage.getItem(tourSeenStorageKey)));
+            if (!guestGameState.hasSeenTour && !localStorage.getItem(tourSeenStorageKey)) {
+              window.requestAnimationFrame(() => setShowTour(true));
+            }
             saveMarsAdventure(token, parsedGuestSave)
               .then(() => localStorage.removeItem("mars_adventure_guest_save_v1"))
               .catch((uploadError: unknown) => {
@@ -294,13 +300,16 @@ export default function Home() {
           }
         } else {
           setSaveReady(true);
+          if (!localStorage.getItem(tourSeenStorageKey)) {
+            window.requestAnimationFrame(() => setShowTour(true));
+          }
         }
       });
 
     return () => {
       cancelled = true;
     };
-  }, [token, hydrateRounds, hydrateRover, hydrateSkills]);
+  }, [token, hydrateRounds, hydrateRover, hydrateSkills, tourSeenStorageKey]);
 
   useEffect(() => {
     if (!saveReady) return;
@@ -323,7 +332,7 @@ export default function Home() {
           drilledHoles: roverState.drilledHoles,
           unlockedSkills,
           skillMinerals,
-          hasSeenTour: !showTour,
+          hasSeenTour: hasSeenTour || Boolean(localStorage.getItem(tourSeenStorageKey)),
         },
       };
     queueMicrotask(() => setSaveStatus("saving"));
@@ -356,7 +365,8 @@ export default function Home() {
     roverState.drilledHoles,
     unlockedSkills,
     skillMinerals,
-    showTour,
+    hasSeenTour,
+    tourSeenStorageKey,
   ]);
 
   const saveImmediately = useCallback(() => {
@@ -376,7 +386,7 @@ export default function Home() {
         drilledHoles: roverState.drilledHoles,
         unlockedSkills,
         skillMinerals,
-        hasSeenTour: !showTour,
+        hasSeenTour: hasSeenTour || Boolean(localStorage.getItem(tourSeenStorageKey)),
       },
     };
     if (!token) {
@@ -384,7 +394,7 @@ export default function Home() {
     } else {
       void saveMarsAdventure(token, save, { keepalive: true });
     }
-  }, [token, saveReady, roverState, code, roundState, language, unlockedSkills, skillMinerals, showTour]);
+  }, [token, saveReady, roverState, code, roundState, language, unlockedSkills, skillMinerals, hasSeenTour, tourSeenStorageKey]);
 
   useEffect(() => {
     window.addEventListener("pagehide", saveImmediately);
@@ -398,8 +408,9 @@ export default function Home() {
 
   const completeTour = useCallback(() => {
     setShowTour(false);
-    localStorage.setItem("mars_adventure_tour_seen", "1");
-  }, []);
+    setHasSeenTour(true);
+    localStorage.setItem(tourSeenStorageKey, "1");
+  }, [tourSeenStorageKey]);
 
   // ── Round completion detection ────────────────────────────────────────────
   // Fire once when animation finishes and we haven't already reported this run
@@ -441,7 +452,7 @@ export default function Home() {
     appendLog({ type: "system", message: "Sending code to Mission Control…" });
 
     try {
-      const res = await fetch(`${API_URL}/run`, {
+      const res = await fetch(`${getBackendApiUrl()}/run`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ code, language }),
@@ -485,7 +496,7 @@ export default function Home() {
       const message = err instanceof Error ? err.message : String(err);
       appendLog({
         type: "error",
-        message: `Connection error: ${message} (API: ${API_URL})`,
+        message: `Connection error: ${message} (API: ${getBackendApiUrl()})`,
       });
       setActiveTab("console");
     } finally {
@@ -678,7 +689,6 @@ export default function Home() {
         onPause={pause}
         onReset={revertCurrentRun}
         onReturnToBase={resetToLandingPad}
-        onTour={() => setShowTour(true)}
         language={language}
         onLanguageChange={handleLanguageChange}
         totalActions={totalActions}
@@ -711,7 +721,7 @@ export default function Home() {
       <div style={{ display: "flex", flex: 1, overflow: "hidden", position: "relative" }}>
 
         {/* MISSION WINDOW — TOP LEFT (OVER MAP) */}
-        <div
+        <div data-tour="command-ide"
           style={{
             position: "absolute",
             top: 0,
@@ -893,7 +903,7 @@ export default function Home() {
         </div>
 
         {/* MAP — FULL AREA */}
-        <div style={{ flex: 1, width: "100%", height: "100%", position: "relative" }}>
+        <div data-tour="tactical-surface" style={{ flex: 1, width: "100%", height: "100%", position: "relative" }}>
           <IsometricGrid
             roverState={roverState}
             isPlaying={isPlaying}

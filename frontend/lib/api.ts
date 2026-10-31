@@ -45,22 +45,29 @@ type ApiErrorBody = {
   detail?: string | Array<{ msg?: string }>;
 };
 
-const configuredApiUrl = (process.env.BACKEND_RENDER_URL ?? "").trim().replace(/\/+$/, "");
+const publicApiUrl = (process.env.NEXT_PUBLIC_BACKEND_URL ?? "").trim().replace(/\/+$/, "");
+const backendApiUrl = (process.env.BACKEND_RENDER_URL ?? "").trim().replace(/\/+$/, "");
 const LOCAL_API_URLS = new Set(["http://localhost:8000", "http://127.0.0.1:8000"]);
 const PRODUCTION_API_URL = "https://mars-rover-backend.onrender.com";
+const isDev = process.env.NODE_ENV !== "production";
 
-function getApiUrl(): string {
+export function getBackendApiUrl(): string {
   if (typeof window !== "undefined") {
     const isLocalFrontend =
       window.location.hostname === "localhost" ||
       window.location.hostname === "127.0.0.1";
-    if (!isLocalFrontend && LOCAL_API_URLS.has(configuredApiUrl)) {
-      return PRODUCTION_API_URL;
-    }
+    if (isDev && isLocalFrontend) return "";
+    if (isLocalFrontend) return LOCAL_API_URLS.has(backendApiUrl) ? backendApiUrl : "http://localhost:8000";
   }
-  return configuredApiUrl || (typeof window !== "undefined" && !LOCAL_API_URLS.has(configuredApiUrl)
-    ? PRODUCTION_API_URL
-    : "http://localhost:8000");
+  return publicApiUrl || backendApiUrl || PRODUCTION_API_URL;
+}
+
+export function getBackendWsUrl(): string {
+  const apiUrl = getBackendApiUrl();
+  if (apiUrl) return apiUrl.replace(/^http/i, "ws");
+  if (typeof window === "undefined") return "";
+  const protocol = window.location.protocol === "https:" ? "wss:" : "ws:";
+  return `${protocol}//${window.location.host}`;
 }
 
 export class ApiError extends Error {
@@ -87,7 +94,7 @@ async function request<T>(path: string, options: RequestOptions = {}): Promise<T
 
   let response: Response;
   try {
-    response = await fetch(`${getApiUrl()}${path}`, {
+    response = await fetch(`${getBackendApiUrl()}${path}`, {
       method,
       headers,
       body: body === undefined ? undefined : JSON.stringify(body),

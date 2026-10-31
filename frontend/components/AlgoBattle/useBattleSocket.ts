@@ -10,11 +10,7 @@ import type {
   BattleSocketMessage,
   ProfileResult,
 } from "./types";
-
-const API_URL = (
-  process.env.BACKEND_RENDER_URL ?? "http://localhost:8000"
-).replace(/\/+$/, "");
-const WS_URL = API_URL.replace(/^http/i, "ws");
+import { getBackendWsUrl } from "@/lib/api";
 
 type ConnectionState = "connecting" | "open" | "closed";
 
@@ -254,7 +250,7 @@ export function useBattleSocket({
       setConnection("connecting");
 
       const socket = new WebSocket(
-        `${WS_URL}/ws/algo-battle/${encodeURIComponent(roomId)}?token=${encodeURIComponent(token)}`
+        `${getBackendWsUrl()}/ws/algo-battle/${encodeURIComponent(roomId)}?token=${encodeURIComponent(token)}`
       );
       socketRef.current = socket;
 

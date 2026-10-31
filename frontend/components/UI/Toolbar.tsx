@@ -13,7 +13,6 @@ interface ToolbarProps {
   onPause: () => void;
   onReset: () => void;
   onReturnToBase: () => void;
-  onTour: () => void;
   language: string;
   onLanguageChange?: (lang: string) => void;
   totalActions: number;
@@ -47,7 +46,6 @@ export default function Toolbar({
   onPause,
   onReset,
   onReturnToBase,
-  onTour,
   language,
   onLanguageChange,
   totalActions,
@@ -118,7 +116,7 @@ export default function Toolbar({
         </div>
       </div>
       <div style={{ width: 1, background: "var(--space-border)", alignSelf: "stretch", margin: "12px 0" }} />
-      <div title={`${minerals} / ${objective} mineral units`} style={{ width: 180, display: "flex", flexDirection: "column", gap: 3 }}>
+      <div data-tour="mission-objectives" title={`${minerals} / ${objective} mineral units`} style={{ width: 180, display: "flex", flexDirection: "column", gap: 3 }}>
         <div style={{ display: "flex", justifyContent: "space-between", fontSize: 10, fontFamily: "var(--font-code)" }}>
           <span style={{ color: "var(--text-muted)", textTransform: "uppercase" }}>Mission quota</span>
           <span style={{ color: minerals >= objective ? "var(--glow-green)" : accentColor }}>{minerals >= objective ? "✓ SECURED" : `${minerals}/${objective}u`}</span>
@@ -127,7 +125,7 @@ export default function Toolbar({
           <div style={{ width: `${objectivePercent}%`, height: "100%", background: minerals >= objective ? "var(--glow-green)" : accentColor, transition: "width .3s ease" }} />
         </div>
       </div>
-      <div title={isCharging ? "Charging at station" : "Battery reserve"} style={{ width: 150, display: "flex", flexDirection: "column", gap: 3 }}>
+      <div data-tour="power-charging" title={isCharging ? "Charging at station" : "Battery reserve"} style={{ width: 150, display: "flex", flexDirection: "column", gap: 3 }}>
         <div style={{ display: "flex", justifyContent: "space-between", fontSize: 10, fontFamily: "var(--font-code)", color: batteryColor }}>
           <span>{isCharging ? "⚡ CHARGING" : "⚡ POWER"}</span><span>{battery}%</span>
         </div>
@@ -246,7 +244,6 @@ export default function Toolbar({
         language={language}
       />
 
-      <button type="button" className="btn btn--ghost" onClick={onTour} title="Open Mission Tour">🧭 Tour</button>
       <span className="badge badge--green" title="Mission save status">{saveStatus === "saving" ? "⏳ Saving" : "☁ Saved"}</span>
 
       {/* Language selector */}

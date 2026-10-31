@@ -5,7 +5,7 @@ const nextConfig: NextConfig = {
   env: {
     BACKEND_RENDER_URL:
       process.env.BACKEND_RENDER_URL ||
-      "http://localhost:8000",
+      "https://mars-rover-backend.onrender.com",
   },
 };
 

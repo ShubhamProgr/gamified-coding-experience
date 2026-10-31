@@ -162,6 +162,7 @@ export function useRoverAnimation(
   const lastTickRef    = useRef<number>(0);
   const actionIdxRef   = useRef<number>(-1);
   const tickRef        = useRef<(ts: number) => void>(() => {});
+  const runStartRef = useRef<RoverState | null>(null);
 
   // Keep refs in sync
   useEffect(() => { stateRef.current = state; }, [state]);
@@ -472,7 +473,55 @@ export function useRoverAnimation(
     };
     setState(fresh);
     stateRef.current = fresh;
+    runStartRef.current = null;
   }, [pause, customDeposits, initialBattery, initialInventory]);
+
+  const prepareRun = useCallback(() => {
+    pause();
+    runStartRef.current = stateRef.current;
+    setIsFinished(false);
+    setProgress(0);
+    setCurrentAction(null);
+    actionIdxRef.current = -1;
+    setState((prev) => ({ ...prev, actionIndex: -1, isMoving: false, isDrilling: false }));
+  }, [pause]);
+
+  const revertCurrentRun = useCallback(() => {
+    const snapshot = runStartRef.current;
+    if (!snapshot) return;
+    pause();
+    const restored = {
+      ...snapshot,
+      deposits: { ...snapshot.deposits },
+      drilledHoles: snapshot.drilledHoles.map((hole) => ({ ...hole })),
+      inventory: { ...snapshot.inventory },
+    };
+    setIsFinished(false);
+    setProgress(0);
+    setCurrentAction(null);
+    actionIdxRef.current = -1;
+    setState(restored);
+    stateRef.current = restored;
+  }, [pause]);
+
+  const resetToLandingPad = useCallback(() => {
+    pause();
+    const restored = {
+      ...stateRef.current,
+      col: START_CELL.col,
+      row: START_CELL.row,
+      facing: "FRONT" as RoverFacing,
+      actionIndex: -1,
+      isMoving: false,
+      isDrilling: false,
+    };
+    setIsFinished(false);
+    setProgress(0);
+    setCurrentAction(null);
+    actionIdxRef.current = -1;
+    setState(restored);
+    stateRef.current = restored;
+  }, [pause]);
 
   const hydrate = useCallback(
     (saved: {
@@ -481,6 +530,8 @@ export function useRoverAnimation(
       facing: RoverFacing;
       battery: number;
       inventory: RoverInventory;
+      deposits?: Record<string, MineralDeposit>;
+      drilledHoles?: Array<{ col: number; row: number; count: number }>;
     }) => {
       pause();
       const restored: RoverState = {
@@ -490,6 +541,8 @@ export function useRoverAnimation(
         facing: saved.facing,
         battery: clamp(saved.battery, 0, 100),
         inventory: saved.inventory,
+        deposits: saved.deposits ?? createInitialDepositsMap(customDeposits),
+        drilledHoles: saved.drilledHoles ?? [],
         minerals:
           saved.inventory.cuprion +
           saved.inventory.pythorium +
@@ -538,12 +591,6 @@ export function useRoverAnimation(
     []
   );
 
-  // Auto-play when new actions arrive
-  useEffect(() => {
-    queueMicrotask(() => reset());
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [actions]);
-
   // Cleanup on unmount
   useEffect(() => {
     return () => {
@@ -562,6 +609,9 @@ export function useRoverAnimation(
     play,
     pause,
     reset,
+    prepareRun,
+    revertCurrentRun,
+    resetToLandingPad,
     spendInventory,
     hydrate,
     totalActions: actions.length,

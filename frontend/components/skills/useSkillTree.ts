@@ -138,5 +138,25 @@ export function useSkillTree() {
     }
   }, []);
 
-  return { unlocked, minerals, unlockFromCode, addMinerals };
+  const hydrate = useCallback((savedUnlocked: string[] = [], savedMinerals: SkillMinerals = {}) => {
+    const nextUnlocked = savedUnlocked.filter(isSkillId);
+    const nextMinerals: SkillMinerals = {};
+    for (const [key, value] of Object.entries(savedMinerals)) {
+      if (isSkillId(key) && Number.isFinite(value)) {
+        nextMinerals[key] = Math.max(0, Math.min(MASTERY_TARGET, Math.floor(value)));
+      }
+    }
+    unlockedRef.current = nextUnlocked;
+    mineralsRef.current = nextMinerals;
+    setUnlocked(nextUnlocked);
+    setMinerals(nextMinerals);
+    try {
+      localStorage.setItem(STORAGE_KEY, JSON.stringify(nextUnlocked));
+      localStorage.setItem(MINERALS_KEY, JSON.stringify(nextMinerals));
+    } catch {
+      // Keep hydrated state in memory when storage is unavailable.
+    }
+  }, []);
+
+  return { unlocked, minerals, unlockFromCode, addMinerals, hydrate };
 }

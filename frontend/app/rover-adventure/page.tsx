@@ -9,7 +9,7 @@ import Storage from "@/components/IDE/Storage";
 import IsometricGrid from "@/components/Canvas/IsometricGrid";
 import { useRoverAnimation, RoverAction } from "@/components/Canvas/useRoverAnimation";
 import { DEFAULT_CODES } from "@/components/IDE/CodeEditor";
-import RoundBanner from "@/components/rounds/RoundBanner";
+import GameTourModal from "@/components/tour/GameTourModal";
 import RoundCompleteModal from "@/components/rounds/RoundCompleteModal";
 import VictoryScreen from "@/components/rounds/VictoryScreen";
 import { useRoundManager } from "@/components/rounds/useRoundManager";
@@ -95,6 +95,8 @@ export default function Home() {
   const [language, setLanguage] = useState("python");
   const [code, setCode] = useState(DEFAULT_CODES["python"]);
   const [saveReady, setSaveReady] = useState(!token);
+  const [saveStatus, setSaveStatus] = useState<"saved" | "saving">("saved");
+  const [showTour, setShowTour] = useState(false);
 
   const handleLanguageChange = useCallback((lang: string) => {
     setLanguage(lang);
@@ -108,6 +110,7 @@ export default function Home() {
     minerals: skillMinerals,
     unlockFromCode,
     addMinerals,
+    hydrate: hydrateSkills,
   } = useSkillTree();
   const [skillUnlock, setSkillUnlock] = useState<SkillId[] | null>(null);
 
@@ -154,6 +157,9 @@ export default function Home() {
     totalActions,
     spendInventory,
     hydrate: hydrateRover,
+    prepareRun,
+    revertCurrentRun,
+    resetToLandingPad,
   } = useRoverAnimation(
     actions,
     currentRoundConfig.radiationZones,
@@ -166,6 +172,41 @@ export default function Home() {
 
   useEffect(() => {
     if (!token) {
+      const raw = localStorage.getItem("mars_adventure_guest_save_v1");
+      if (raw) {
+        try {
+          const saved = JSON.parse(raw) as MarsAdventureSave;
+          const gameState = saved.game_state;
+          hydrateRounds({
+            currentRound: gameState.currentRound,
+            starsEarned: gameState.starsEarned,
+            cumulativeMinerals: gameState.cumulativeMinerals,
+            persistentBattery: gameState.persistentBattery,
+            persistentInventory: saved.resources,
+            buildings: gameState.buildings,
+          });
+          hydrateRover({
+            ...saved.last_location,
+            battery: gameState.persistentBattery ?? 100,
+            inventory: saved.resources,
+            deposits: gameState.deposits,
+            drilledHoles: gameState.drilledHoles,
+          });
+          queueMicrotask(() => {
+            setLanguage(gameState.language ?? "python");
+            setCode(saved.last_code || DEFAULT_CODES[gameState.language ?? "python"]);
+          });
+          hydrateSkills(gameState.unlockedSkills, gameState.skillMinerals);
+          if (!gameState.hasSeenTour && !localStorage.getItem("mars_adventure_tour_seen")) {
+            window.setTimeout(() => setShowTour(true), 800);
+          }
+        } catch (error) {
+          console.error("Could not load guest Mars Adventure progress.", error);
+        }
+      }
+      if (!raw && !localStorage.getItem("mars_adventure_tour_seen")) {
+        window.setTimeout(() => setShowTour(true), 800);
+      }
       return;
     }
 
@@ -189,8 +230,17 @@ export default function Home() {
           ...saved.last_location,
           battery: gameState.persistentBattery ?? 100,
           inventory: saved.resources,
+          deposits: gameState.deposits,
+          drilledHoles: gameState.drilledHoles,
         });
-        setCode(saved.last_code);
+        queueMicrotask(() => {
+          setLanguage(gameState.language ?? "python");
+          setCode(saved.last_code || DEFAULT_CODES[gameState.language ?? "python"]);
+        });
+        hydrateSkills(gameState.unlockedSkills, gameState.skillMinerals);
+        if (!gameState.hasSeenTour && !localStorage.getItem("mars_adventure_tour_seen")) {
+          window.setTimeout(() => setShowTour(true), 800);
+        }
         setSaveReady(true);
       })
       .catch((error: unknown) => {
@@ -207,18 +257,54 @@ export default function Home() {
         }
         // A missing save is a new game. Enable autosave so the default state
         // is inserted into marsAdvData without blocking the game behind a popup.
-        setSaveReady(true);
+        const guestSave = localStorage.getItem("mars_adventure_guest_save_v1");
+        if (guestSave) {
+          try {
+            const parsedGuestSave = JSON.parse(guestSave) as MarsAdventureSave;
+            const guestGameState = parsedGuestSave.game_state;
+            hydrateRounds({
+              currentRound: guestGameState.currentRound,
+              starsEarned: guestGameState.starsEarned,
+              cumulativeMinerals: guestGameState.cumulativeMinerals,
+              persistentBattery: guestGameState.persistentBattery,
+              persistentInventory: parsedGuestSave.resources,
+              buildings: guestGameState.buildings,
+            });
+            hydrateRover({
+              ...parsedGuestSave.last_location,
+              battery: guestGameState.persistentBattery ?? 100,
+              inventory: parsedGuestSave.resources,
+              deposits: guestGameState.deposits,
+              drilledHoles: guestGameState.drilledHoles,
+            });
+            queueMicrotask(() => {
+              setLanguage(guestGameState.language ?? "python");
+              setCode(parsedGuestSave.last_code || DEFAULT_CODES[guestGameState.language ?? "python"]);
+            });
+            hydrateSkills(guestGameState.unlockedSkills, guestGameState.skillMinerals);
+            saveMarsAdventure(token, parsedGuestSave)
+              .then(() => localStorage.removeItem("mars_adventure_guest_save_v1"))
+              .catch((uploadError: unknown) => {
+                console.error("Could not upload guest Mars Adventure progress.", uploadError);
+              })
+              .finally(() => setSaveReady(true));
+          } catch (parseError) {
+            console.error("Could not parse guest Mars Adventure progress.", parseError);
+            setSaveReady(true);
+          }
+        } else {
+          setSaveReady(true);
+        }
       });
 
     return () => {
       cancelled = true;
     };
-  }, [token, hydrateRounds, hydrateRover]);
+  }, [token, hydrateRounds, hydrateRover, hydrateSkills]);
 
   useEffect(() => {
-    if (!token || !saveReady) return;
-    const timer = window.setTimeout(() => {
-      const save: MarsAdventureSave = {
+    if (!saveReady) return;
+    const save: MarsAdventureSave = {
         resources: roverState.inventory,
         last_location: {
           col: roverState.col,
@@ -232,11 +318,24 @@ export default function Home() {
           cumulativeMinerals: roundState.cumulativeMinerals,
           persistentBattery: roverState.battery,
           buildings: roundState.buildings,
+          language: language as "python" | "java" | "cpp",
+          deposits: roverState.deposits,
+          drilledHoles: roverState.drilledHoles,
+          unlockedSkills,
+          skillMinerals,
+          hasSeenTour: !showTour,
         },
       };
-      saveMarsAdventure(token, save).catch((error: unknown) => {
-        console.error("Could not save Mars Adventure progress.", error);
-      });
+    queueMicrotask(() => setSaveStatus("saving"));
+    const timer = window.setTimeout(() => {
+      if (!token) {
+        localStorage.setItem("mars_adventure_guest_save_v1", JSON.stringify(save));
+        setSaveStatus("saved");
+        return;
+      }
+      saveMarsAdventure(token, save).then(() => setSaveStatus("saved")).catch((error: unknown) => {
+          console.error("Could not save Mars Adventure progress.", error);
+        });
     }, 800);
     return () => window.clearTimeout(timer);
   }, [
@@ -252,7 +351,55 @@ export default function Home() {
     roundState.starsEarned,
     roundState.cumulativeMinerals,
     roundState.buildings,
+    language,
+    roverState.deposits,
+    roverState.drilledHoles,
+    unlockedSkills,
+    skillMinerals,
+    showTour,
   ]);
+
+  const saveImmediately = useCallback(() => {
+    if (!saveReady) return;
+    const save: MarsAdventureSave = {
+      resources: roverState.inventory,
+      last_location: { col: roverState.col, row: roverState.row, facing: roverState.facing },
+      last_code: code,
+      game_state: {
+        currentRound: roundState.currentRound,
+        starsEarned: roundState.starsEarned,
+        cumulativeMinerals: roundState.cumulativeMinerals,
+        persistentBattery: roverState.battery,
+        buildings: roundState.buildings,
+        language: language as "python" | "java" | "cpp",
+        deposits: roverState.deposits,
+        drilledHoles: roverState.drilledHoles,
+        unlockedSkills,
+        skillMinerals,
+        hasSeenTour: !showTour,
+      },
+    };
+    if (!token) {
+      localStorage.setItem("mars_adventure_guest_save_v1", JSON.stringify(save));
+    } else {
+      void saveMarsAdventure(token, save, { keepalive: true });
+    }
+  }, [token, saveReady, roverState, code, roundState, language, unlockedSkills, skillMinerals, showTour]);
+
+  useEffect(() => {
+    window.addEventListener("pagehide", saveImmediately);
+    window.addEventListener("beforeunload", saveImmediately);
+    return () => {
+      saveImmediately();
+      window.removeEventListener("pagehide", saveImmediately);
+      window.removeEventListener("beforeunload", saveImmediately);
+    };
+  }, [saveImmediately]);
+
+  const completeTour = useCallback(() => {
+    setShowTour(false);
+    localStorage.setItem("mars_adventure_tour_seen", "1");
+  }, []);
 
   // ── Round completion detection ────────────────────────────────────────────
   // Fire once when animation finishes and we haven't already reported this run
@@ -288,7 +435,7 @@ export default function Home() {
     if (isRunning) return;
     setIsRunning(true);
     setPlacingBuilding(null);
-    reset();
+    prepareRun();
     setLogs([]);
 
     appendLog({ type: "system", message: "Sending code to Mission Control…" });
@@ -344,7 +491,7 @@ export default function Home() {
     } finally {
       setIsRunning(false);
     }
-  }, [code, language, isRunning, reset, appendLog, play, unlockFromCode]);
+  }, [code, language, isRunning, prepareRun, appendLog, play, unlockFromCode]);
 
   // ── Log new actions as they play ──────────────────────────────────────────
   useEffect(() => {
@@ -529,13 +676,23 @@ export default function Home() {
         onSpeedChange={setSpeed}
         onPlay={play}
         onPause={pause}
-        onReset={reset}
+        onReset={revertCurrentRun}
+        onReturnToBase={resetToLandingPad}
+        onTour={() => setShowTour(true)}
         language={language}
         onLanguageChange={handleLanguageChange}
         totalActions={totalActions}
         actionIndex={roverState.actionIndex}
         unlockedSkills={unlockedSkills}
         skillMinerals={skillMinerals}
+        roundName={currentRoundConfig.name}
+        roundIcon={currentRoundConfig.icon}
+        accentColor={currentRoundConfig.accentColor}
+        objective={currentRoundConfig.mineralTarget}
+        minerals={roundState.cumulativeMinerals + roverState.minerals}
+        battery={roverState.battery}
+        isCharging={currentAction?.action === "CHARGE"}
+        saveStatus={saveStatus}
       />
 
       {/* Skill unlock lesson */}
@@ -548,13 +705,7 @@ export default function Home() {
         />
       )}
 
-      {/* Round objective banner */}
-      <RoundBanner
-        roundConfig={currentRoundConfig}
-        cumulativeMinerals={roundState.cumulativeMinerals + roverState.minerals}
-        starsEarned={roundState.starsEarned}
-        battery={roverState.battery}
-      />
+      {showTour && <GameTourModal onComplete={completeTour} />}
 
       {/* Main visual workspace */}
       <div style={{ display: "flex", flex: 1, overflow: "hidden", position: "relative" }}>

@@ -12,12 +12,22 @@ interface ToolbarProps {
   onPlay: () => void;
   onPause: () => void;
   onReset: () => void;
+  onReturnToBase: () => void;
+  onTour: () => void;
   language: string;
   onLanguageChange?: (lang: string) => void;
   totalActions: number;
   actionIndex: number;
   unlockedSkills: SkillId[];
   skillMinerals: Partial<Record<SkillId, number>>;
+  roundName: string;
+  roundIcon: string;
+  accentColor: string;
+  objective: number;
+  minerals: number;
+  battery: number;
+  isCharging: boolean;
+  saveStatus: "saved" | "saving";
 }
 
 const SPEED_STEPS = [
@@ -36,14 +46,26 @@ export default function Toolbar({
   onPlay,
   onPause,
   onReset,
+  onReturnToBase,
+  onTour,
   language,
   onLanguageChange,
   totalActions,
   actionIndex,
   unlockedSkills,
   skillMinerals,
+  roundName,
+  roundIcon,
+  accentColor,
+  objective,
+  minerals,
+  battery,
+  isCharging,
+  saveStatus,
 }: ToolbarProps) {
   const actionsCompleted = Math.max(0, actionIndex + 1);
+  const objectivePercent = Math.min(100, Math.round((minerals / objective) * 100));
+  const batteryColor = battery < 25 ? "var(--glow-red)" : battery < 60 ? "var(--glow-amber)" : "var(--glow-green)";
 
   return (
     <header
@@ -52,7 +74,7 @@ export default function Toolbar({
         alignItems: "center",
         gap: 12,
         padding: "0 16px",
-        height: 52,
+        minHeight: 58,
         borderBottom: "1px solid var(--space-border)",
         background: "var(--space-mid)",
         flexShrink: 0,
@@ -88,6 +110,32 @@ export default function Toolbar({
 
       <div style={{ width: 1, background: "var(--space-border)", alignSelf: "stretch", margin: "12px 0" }} />
 
+      <div title={roundName} style={{ display: "flex", alignItems: "center", gap: 6, minWidth: 130 }}>
+        <span style={{ fontSize: 18 }}>{roundIcon}</span>
+        <div>
+          <div style={{ color: accentColor, fontSize: 10, fontWeight: 700, textTransform: "uppercase" }}>{roundName}</div>
+          <div style={{ color: "var(--text-muted)", fontSize: 10 }}>Round objective</div>
+        </div>
+      </div>
+      <div style={{ width: 1, background: "var(--space-border)", alignSelf: "stretch", margin: "12px 0" }} />
+      <div title={`${minerals} / ${objective} mineral units`} style={{ width: 180, display: "flex", flexDirection: "column", gap: 3 }}>
+        <div style={{ display: "flex", justifyContent: "space-between", fontSize: 10, fontFamily: "var(--font-code)" }}>
+          <span style={{ color: "var(--text-muted)", textTransform: "uppercase" }}>Mission quota</span>
+          <span style={{ color: minerals >= objective ? "var(--glow-green)" : accentColor }}>{minerals >= objective ? "✓ SECURED" : `${minerals}/${objective}u`}</span>
+        </div>
+        <div style={{ height: 7, borderRadius: 4, background: "var(--space-border)", overflow: "hidden" }}>
+          <div style={{ width: `${objectivePercent}%`, height: "100%", background: minerals >= objective ? "var(--glow-green)" : accentColor, transition: "width .3s ease" }} />
+        </div>
+      </div>
+      <div title={isCharging ? "Charging at station" : "Battery reserve"} style={{ width: 150, display: "flex", flexDirection: "column", gap: 3 }}>
+        <div style={{ display: "flex", justifyContent: "space-between", fontSize: 10, fontFamily: "var(--font-code)", color: batteryColor }}>
+          <span>{isCharging ? "⚡ CHARGING" : "⚡ POWER"}</span><span>{battery}%</span>
+        </div>
+        <div style={{ height: 7, borderRadius: 4, background: "var(--space-border)", overflow: "hidden" }}>
+          <div style={{ width: `${battery}%`, height: "100%", background: batteryColor, transition: "width .3s ease" }} />
+        </div>
+      </div>
+
       {/* Playback controls */}
       <div style={{ display: "flex", alignItems: "center", gap: 4 }}>
         <button
@@ -100,6 +148,15 @@ export default function Toolbar({
           style={{ fontSize: 16, padding: "4px 8px" }}
         >
           {isPlaying ? "⏸" : "▶"}
+        </button>
+        <button
+          type="button"
+          className="btn btn--ghost btn--icon"
+          onClick={onReturnToBase}
+          title="Return to landing pad (preserves mission progress)"
+          style={{ fontSize: 13, padding: "4px 8px" }}
+        >
+          🏠
         </button>
         <button
           type="button"
@@ -188,6 +245,9 @@ export default function Toolbar({
         skillMinerals={skillMinerals}
         language={language}
       />
+
+      <button type="button" className="btn btn--ghost" onClick={onTour} title="Open Mission Tour">🧭 Tour</button>
+      <span className="badge badge--green" title="Mission save status">{saveStatus === "saving" ? "⏳ Saving" : "☁ Saved"}</span>
 
       {/* Language selector */}
       <select

@@ -117,6 +117,50 @@ async function request<T>(path: string, options: RequestOptions = {}): Promise<T
   return data as T;
 }
 
+export type WanderRunResult = {
+  success: boolean;
+  stars_earned: number;
+  star_details: {
+    objective: boolean;
+    optimal_hops: boolean;
+    in_place_memory: boolean;
+  };
+  metrics: {
+    pointer_reads: number;
+    pointer_writes: number;
+    auxiliary_space_bytes: number;
+  };
+  timeline: Array<Record<string, unknown>>;
+  stdout: string;
+  error: string | null;
+};
+
+export type WanderListSave = {
+  current_level: number;
+  unlocked_levels: number;
+  stars_by_level: Record<string, number>;
+  code_by_level: Record<string, string>;
+};
+
+export function runWanderList(levelId: number, code: string, language: "python" | "java" | "cpp"): Promise<WanderRunResult> {
+  return request<WanderRunResult>("/wanderlist/run", {
+    method: "POST",
+    body: { level_id: levelId, code, language },
+  });
+}
+
+export function getWanderListSave(token: string): Promise<WanderListSave> {
+  return request<WanderListSave>("/games/wanderlist/save", { token });
+}
+
+export function saveWanderList(token: string, save: WanderListSave): Promise<WanderListSave> {
+  return request<WanderListSave>("/games/wanderlist/save", {
+    method: "PUT",
+    token,
+    body: save,
+  });
+}
+
 export { request as apiRequest };
 
 export function login(username: string, password: string): Promise<AuthSessionResponse> {

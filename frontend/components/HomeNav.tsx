@@ -1,10 +1,13 @@
 "use client";
 
 import Link from "next/link";
+import { useState } from "react";
 import { useAuth } from "@/components/AuthContext";
+import AuthModal from "@/components/AuthModal";
 
 export default function HomeNav() {
   const { user, logout } = useAuth();
+  const [authMode, setAuthMode] = useState<"login" | "register" | null>(null);
 
   return (
     <header className="home-nav">
@@ -22,15 +25,18 @@ export default function HomeNav() {
           </>
         ) : (
           <>
-            <Link href="/login" className="home-nav-link">
+            <button type="button" className="home-nav-link" onClick={() => setAuthMode("login")}>
               Login
-            </Link>
-            <Link href="/register" className="home-nav-link">
+            </button>
+            <button type="button" className="home-nav-link" onClick={() => setAuthMode("register")}>
               Register
-            </Link>
+            </button>
           </>
         )}
       </div>
+      {authMode && (
+        <AuthModal mode={authMode} onClose={() => setAuthMode(null)} />
+      )}
     </header>
   );
 }

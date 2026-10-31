@@ -82,6 +82,7 @@ app.add_middleware(
 
 # ── Algo Battle game router ────────────────────────────────────────────────
 from algo_battle.router import router as algo_battle_router  # noqa: E402
+from wander_sdk.runner import run_submission  # noqa: E402
 
 app.include_router(algo_battle_router)
 
@@ -264,6 +265,32 @@ def _ensure_mars_adventure_table() -> None:
         print(f"Warning: could not ensure Mars Adventure table: {exc}")
 
 
+def _ensure_wanderlist_table() -> None:
+    """Create the per-user WanderList progress table."""
+    try:
+        conn = psycopg2.connect(**conn_params)
+        try:
+            with conn.cursor() as cur:
+                cur.execute(
+                    """
+                    CREATE TABLE IF NOT EXISTS wanderlist_saves (
+                        user_id BIGINT PRIMARY KEY REFERENCES users(id) ON DELETE CASCADE,
+                        current_level INTEGER NOT NULL DEFAULT 1,
+                        unlocked_levels INTEGER NOT NULL DEFAULT 1,
+                        stars_by_level JSONB NOT NULL DEFAULT '{}'::jsonb,
+                        code_by_level JSONB NOT NULL DEFAULT '{}'::jsonb,
+                        created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+                        updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+                    )
+                    """
+                )
+            conn.commit()
+        finally:
+            conn.close()
+    except Exception as exc:
+        print(f"Warning: could not ensure WanderList table: {exc}")
+
+
 # ── Schema ─────────────────────────────────────────────────────────────────
 
 SUPPORTED_LANGUAGES = {"python", "cpp", "java"}
@@ -321,6 +348,19 @@ class MarsAdventureSave(BaseModel):
         if len(value) > 100_000:
             raise ValueError("Last code must be at most 100000 characters")
         return value
+
+
+class WanderRunRequest(BaseModel):
+    level_id: int = Field(ge=1, le=16)
+    code: str = Field(min_length=1, max_length=20_000)
+    language: Literal["python", "java", "cpp"] = "python"
+
+
+class WanderSave(BaseModel):
+    current_level: int = Field(default=1, ge=1, le=16)
+    unlocked_levels: int = Field(default=1, ge=1, le=16)
+    stars_by_level: dict[str, int] = Field(default_factory=dict)
+    code_by_level: dict[str, str] = Field(default_factory=dict)
 
 
 # ── Safety checks ──────────────────────────────────────────────────────────
@@ -836,12 +876,94 @@ async def put_mars_adventure_save(
     return MarsAdventureSave(**saved)
 
 
+def _get_wanderlist_save(user_id: int) -> dict[str, Any] | None:
+    conn = psycopg2.connect(**conn_params)
+    try:
+        with conn.cursor(cursor_factory=RealDictCursor) as cur:
+            cur.execute(
+                "SELECT current_level, unlocked_levels, stars_by_level, code_by_level "
+                "FROM wanderlist_saves WHERE user_id = %s",
+                (user_id,),
+            )
+            row = cur.fetchone()
+            return dict(row) if row else None
+    finally:
+        conn.close()
+
+
+def _save_wanderlist(user_id: int, save: WanderSave) -> dict[str, Any]:
+    conn = psycopg2.connect(**conn_params)
+    try:
+        with conn.cursor(cursor_factory=RealDictCursor) as cur:
+            cur.execute(
+                """
+                INSERT INTO wanderlist_saves
+                    (user_id, current_level, unlocked_levels, stars_by_level, code_by_level)
+                VALUES (%s, %s, %s, %s, %s)
+                ON CONFLICT (user_id) DO UPDATE SET
+                    current_level = EXCLUDED.current_level,
+                    unlocked_levels = EXCLUDED.unlocked_levels,
+                    stars_by_level = EXCLUDED.stars_by_level,
+                    code_by_level = EXCLUDED.code_by_level,
+                    updated_at = NOW()
+                RETURNING current_level, unlocked_levels, stars_by_level, code_by_level
+                """,
+                (
+                    user_id,
+                    save.current_level,
+                    save.unlocked_levels,
+                    json.dumps(save.stars_by_level),
+                    json.dumps(save.code_by_level),
+                ),
+            )
+            row = cur.fetchone()
+        conn.commit()
+        return dict(row)
+    finally:
+        conn.close()
+
+
+@app.post("/wanderlist/run")
+async def run_wanderlist(request: WanderRunRequest) -> dict[str, Any]:
+    """Run a bounded linked-list submission and return its playback timeline."""
+    result = await asyncio.to_thread(
+        run_submission, request.code, request.level_id, request.language
+    )
+    return result.as_dict()
+
+
+@app.get("/games/wanderlist/save", response_model=WanderSave)
+async def get_wanderlist_save(
+    current_user: dict = Depends(_get_current_user),
+) -> WanderSave:
+    try:
+        save = await asyncio.to_thread(_get_wanderlist_save, current_user["id"])
+    except Exception as exc:
+        print(f"Warning: could not load WanderList save: {exc}")
+        raise HTTPException(status_code=503, detail="Game save is temporarily unavailable")
+    return WanderSave(**(save or {}))
+
+
+@app.put("/games/wanderlist/save", response_model=WanderSave)
+async def put_wanderlist_save(
+    save: WanderSave,
+    current_user: dict = Depends(_get_current_user),
+) -> WanderSave:
+    try:
+        saved = await asyncio.to_thread(_save_wanderlist, current_user["id"], save)
+    except Exception as exc:
+        print(f"Warning: could not save WanderList progress: {exc}")
+        raise HTTPException(status_code=503, detail="Game save is temporarily unavailable")
+    return WanderSave(**saved)
+
+
 # ── Endpoints ──────────────────────────────────────────────────────────────
 
 @app.on_event("startup")
 async def _startup() -> None:
     _ensure_users_table()
     _ensure_mars_adventure_table()
+    _ensure_wanderlist_table()
     from algo_battle import db as algo_battle_db
 
     await asyncio.to_thread(algo_battle_db.initialize)

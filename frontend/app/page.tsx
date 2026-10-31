@@ -19,10 +19,11 @@ const CLOUDINARY_CLOUD_NAME =
 // Paste either the public ID or the full Cloudinary URL here.
 const THUMBNAIL_PUBLIC_IDS = {
   roverAdventure:
-    "https://res.cloudinary.com/ikjuljmm/image/upload/v1793025165/marsRoverThumbnail.png",
+    "https://res.cloudinary.com/ikjuljmm/image/upload/v1793449404/marsRoverThumbnail-clean.png",
   algoBattle:
-    "https://res.cloudinary.com/ikjuljmm/image/upload/v1793258845/algoBattleThumbnail.png",
-  slot2: "",
+    "https://res.cloudinary.com/ikjuljmm/image/upload/v1793449404/algoBattleThumbnail-clean.png",
+  wanderlist:
+    "https://res.cloudinary.com/ikjuljmm/image/upload/v1793449404/wanderListThumbnail.png",
 };
 
 function cloudinaryThumbnail(source: string, width = 1024) {
@@ -75,13 +76,13 @@ const GAMES: Game[] = [
     image: cloudinaryThumbnail(THUMBNAIL_PUBLIC_IDS.algoBattle),
   },
   {
-    id: "placeholder-2",
-    title: "Coming Soon",
-    description: "",
-    href: "#",
-    tags: [],
-    image: cloudinaryThumbnail(THUMBNAIL_PUBLIC_IDS.slot2),
-    placeholder: true,
+    id: "wanderlist",
+    title: "WanderList",
+    description:
+      "Plan a cheerful city itinerary while mastering singly, circular, and doubly linked lists.",
+    href: "/wanderlist",
+    tags: ["Python", "Linked Lists", "Pointers", "City", "16 Levels"],
+    image: cloudinaryThumbnail(THUMBNAIL_PUBLIC_IDS.wanderlist),
   },
 ];
 
@@ -224,13 +225,34 @@ export default function Home() {
     <main className="home-shell" ref={shellRef}>
       <div className="home-scene" aria-hidden="true">
         <div className="home-space" />
-        <div className="home-desert" />
+        <div className="home-city">
+          <div className="home-city-sun" />
+          <div className="home-city-clouds" />
+          <div className="home-city-skyline">
+            <div className="home-city-landmark home-city-landmark--monument">
+              <span className="home-city-landmark-label">MONUMENT</span>
+            </div>
+            <div className="home-city-landmark home-city-landmark--museum">
+              <span className="home-city-landmark-label">MUSEUM</span>
+            </div>
+            <div className="home-city-landmark home-city-landmark--cafe">
+              <span className="home-city-landmark-label">CAFE</span>
+            </div>
+            <span className="home-city-building home-city-building--one" />
+            <span className="home-city-building home-city-building--two" />
+            <span className="home-city-building home-city-building--three" />
+          </div>
+          <div className="home-city-ground">
+            <span className="home-city-road" />
+            <span className="home-city-tree home-city-tree--one" />
+            <span className="home-city-tree home-city-tree--two" />
+          </div>
+        </div>
         <div className="home-stars">
           <span className="shooting-star shooting-star--1" />
           <span className="shooting-star shooting-star--2" />
           <span className="shooting-star shooting-star--3" />
         </div>
-        <div className="home-dunes" />
       </div>
       <div className="home-grid" aria-hidden="true" />
 
@@ -394,7 +416,9 @@ export default function Home() {
                       className={`game-card-art${
                         game.id === "algo-battle"
                           ? " game-card-art--algo"
-                          : ""
+                          : game.id === "wanderlist"
+                            ? " game-card-art--wander"
+                            : ""
                       }`}
                       aria-hidden="true"
                     >
@@ -405,6 +429,8 @@ export default function Home() {
                           <span className="game-card-clash" />
                           <span className="game-card-grid" />
                         </>
+                      ) : game.id === "wanderlist" ? (
+                        <span className="game-card-wander-scene" aria-label="Daytime city itinerary">☀️ 🏨 ☕ 🏛️ 🌲</span>
                       ) : (
                         <>
                           <span className="game-card-planet" />

@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useCallback, useRef, useEffect } from "react";
+import { useState, useCallback, useRef, useEffect, useMemo } from "react";
 import dynamic from "next/dynamic";
 
 import Toolbar from "@/components/UI/Toolbar";
@@ -136,7 +136,10 @@ export default function Home() {
   } = useRoundManager();
 
   // Compute per-round deposits for the animation hook
-  const currentRoundDeposits = getDepositsForRound(roundState.currentRound);
+  const currentRoundDeposits = useMemo(
+    () => getDepositsForRound(roundState.currentRound),
+    [getDepositsForRound, roundState.currentRound]
+  );
 
   const chargingUnlocked = roundState.currentRound >= BUILDINGS_UNLOCK_ROUND;
   const chargingStations = roundState.buildings
@@ -199,14 +202,14 @@ export default function Home() {
           hydrateSkills(gameState.unlockedSkills, gameState.skillMinerals);
           queueMicrotask(() => setHasSeenTour(Boolean(gameState.hasSeenTour || localStorage.getItem(tourSeenStorageKey))));
           if (!gameState.hasSeenTour && !localStorage.getItem(tourSeenStorageKey)) {
-            window.requestAnimationFrame(() => setShowTour(true));
+            window.setTimeout(() => setShowTour(true), 600);
           }
         } catch (error) {
           console.error("Could not load guest Mars Adventure progress.", error);
         }
       }
       if (!raw && !localStorage.getItem(tourSeenStorageKey)) {
-        window.requestAnimationFrame(() => setShowTour(true));
+        window.setTimeout(() => setShowTour(true), 600);
       }
       return;
     }
@@ -241,7 +244,7 @@ export default function Home() {
         hydrateSkills(gameState.unlockedSkills, gameState.skillMinerals);
         setHasSeenTour(Boolean(gameState.hasSeenTour || localStorage.getItem(tourSeenStorageKey)));
         if (!gameState.hasSeenTour && !localStorage.getItem(tourSeenStorageKey)) {
-          window.requestAnimationFrame(() => setShowTour(true));
+          window.setTimeout(() => setShowTour(true), 600);
         }
         setSaveReady(true);
       })
@@ -286,7 +289,7 @@ export default function Home() {
             hydrateSkills(guestGameState.unlockedSkills, guestGameState.skillMinerals);
             setHasSeenTour(Boolean(guestGameState.hasSeenTour || localStorage.getItem(tourSeenStorageKey)));
             if (!guestGameState.hasSeenTour && !localStorage.getItem(tourSeenStorageKey)) {
-              window.requestAnimationFrame(() => setShowTour(true));
+              window.setTimeout(() => setShowTour(true), 600);
             }
             saveMarsAdventure(token, parsedGuestSave)
               .then(() => localStorage.removeItem("mars_adventure_guest_save_v1"))
@@ -301,7 +304,7 @@ export default function Home() {
         } else {
           setSaveReady(true);
           if (!localStorage.getItem(tourSeenStorageKey)) {
-            window.requestAnimationFrame(() => setShowTour(true));
+            window.setTimeout(() => setShowTour(true), 600);
           }
         }
       });
@@ -310,6 +313,19 @@ export default function Home() {
       cancelled = true;
     };
   }, [token, hydrateRounds, hydrateRover, hydrateSkills, tourSeenStorageKey]);
+
+  useEffect(() => {
+    const handleTourShortcut = (event: KeyboardEvent) => {
+      if (event.key === "?" || (event.shiftKey && event.key === "/")) {
+        const target = event.target as HTMLElement | null;
+        if (target?.isContentEditable || ["INPUT", "TEXTAREA", "SELECT"].includes(target?.tagName ?? "")) return;
+        event.preventDefault();
+        setShowTour(true);
+      }
+    };
+    window.addEventListener("keydown", handleTourShortcut);
+    return () => window.removeEventListener("keydown", handleTourShortcut);
+  }, []);
 
   useEffect(() => {
     if (!saveReady) return;

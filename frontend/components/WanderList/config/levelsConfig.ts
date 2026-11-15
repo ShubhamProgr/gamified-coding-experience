@@ -27,6 +27,16 @@ const reverse = `def solve(head):
         curr = next_node
     return prev`;
 
+const doublyReverse = `def solve(head):
+    curr = head
+    while curr:
+        next_node = curr.next
+        curr.next = curr.prev
+        curr.prev = next_node
+        head = curr
+        curr = next_node
+    return head`;
+
 const javaTraversal = `static Node solve(Node head) {
     Node curr = head;
     while (curr != null) {
@@ -69,6 +79,30 @@ const cppReverse = `Node* solve(Node* head) {
     return prev;
 }`;
 
+const javaDoublyReverse = `static Node solve(Node head) {
+    Node curr = head;
+    while (curr != null) {
+        Node nextNode = curr.next;
+        curr.next = curr.prev;
+        curr.prev = nextNode;
+        head = curr;
+        curr = nextNode;
+    }
+    return head;
+}`;
+
+const cppDoublyReverse = `Node* solve(Node* head) {
+    Node* curr = head;
+    while (curr != nullptr) {
+        Node* nextNode = curr->next;
+        curr->next = curr->prev;
+        curr->prev = nextNode;
+        head = curr;
+        curr = nextNode;
+    }
+    return head;
+}`;
+
 export const WANDER_LEVELS: WanderLevel[] = [
   ["Search by Value", "Find a landmark by its name.", "Compare curr.name before advancing.", traversal, "singly"],
   ["Trip Odometer", "Count every stop on the itinerary.", "Increment a counter before curr = curr.next.", traversal, "singly"],
@@ -85,6 +119,7 @@ export const WANDER_LEVELS: WanderLevel[] = [
   ["Forgot the Passport!", "Walk backwards using prev to return to the hotel.", "The head of a DLL has prev = None.", traversal, "doubly"],
   ["Tour Group Fork", "Split the itinerary into two independent lists.", "Clear both new heads' prev pointers.", traversal, "doubly"],
   ["The Grand Schedule Swap", "Swap adjacent stops without losing any links.", "Reconnect both outside neighbors and all four boundaries.", traversal, "doubly"],
+  ["Midnight Reversal", "Reverse the two-way boulevard in place.", "Swap both next and prev on every stop, then return the new head.", doublyReverse, "doubly"],
 ].map(([title, task, hint, starterCode, category], index) => ({
   id: index + 1,
   tier: index < 3 ? "Singly basics" : index < 7 ? "Singly surgery" : index < 11 ? "Circular loops" : "Doubly mastery",
@@ -95,7 +130,7 @@ export const WANDER_LEVELS: WanderLevel[] = [
   category: category as WanderLevel["category"],
   starterCodeByLanguage: {
     python: starterCode,
-    java: starterCode === reverse ? javaReverse : javaTraversal,
-    cpp: starterCode === reverse ? cppReverse : cppTraversal,
+    java: starterCode === reverse ? javaReverse : starterCode === doublyReverse ? javaDoublyReverse : javaTraversal,
+    cpp: starterCode === reverse ? cppReverse : starterCode === doublyReverse ? cppDoublyReverse : cppTraversal,
   },
 }));

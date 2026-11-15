@@ -14,6 +14,6 @@ export default function DualCanvasContainer({
 }) {
   return <div className="wander-dual-canvas">
     <CityMapCanvas activeNode={activeNode} direction={direction} />
-    <PointerGraphCanvas circular={level >= 9 && level <= 12} doubly={level >= 13} />
+    <PointerGraphCanvas circular={level >= 9 && level <= 11} doubly={level >= 12} />
   </div>;
 }

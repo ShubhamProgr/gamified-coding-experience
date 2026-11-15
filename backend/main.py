@@ -926,10 +926,31 @@ def _save_wanderlist(user_id: int, save: WanderSave) -> dict[str, Any]:
 @app.post("/wanderlist/run")
 async def run_wanderlist(request: WanderRunRequest) -> dict[str, Any]:
     """Run a bounded linked-list submission and return its playback timeline."""
-    result = await asyncio.to_thread(
-        run_submission, request.code, request.level_id, request.language
-    )
-    return result.as_dict()
+    try:
+        result = await asyncio.to_thread(
+            run_submission, request.code, request.level_id, request.language
+        )
+        return result.as_dict()
+    except Exception as exc:
+        # Never let a malformed submission take down the game endpoint.
+        print(f"Warning: WanderList run failed: {exc}")
+        return {
+            "success": False,
+            "stars_earned": 0,
+            "star_details": {
+                "objective": False,
+                "optimal_hops": False,
+                "in_place_memory": False,
+            },
+            "metrics": {
+                "pointer_reads": 0,
+                "pointer_writes": 0,
+                "auxiliary_space_bytes": 0,
+            },
+            "timeline": [],
+            "stdout": "",
+            "error": f"Could not run your itinerary: {exc}",
+        }
 
 
 @app.get("/games/wanderlist/save", response_model=WanderSave)
@@ -1010,14 +1031,3 @@ async def run_code(request: RunRequest) -> RunResponse:
         )
     runner = LANGUAGE_RUNNERS[request.language]
     return runner(request.code)
-
-
-# ── Language router ────────────────────────────────────────────────────────
-# To add a new language: add an entry here pointing to a runner function
-# that accepts a `code: str` and returns `RunResponse`.
-
-LANGUAGE_RUNNERS = {
-    "python": _run_python,
-    "cpp": _run_cpp,
-    "java": _run_java,
-}

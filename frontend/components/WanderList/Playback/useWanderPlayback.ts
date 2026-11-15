@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from "react";
 
-export function useWanderPlayback(length: number) {
+export function useWanderPlayback(length: number, resetKey?: unknown) {
   const [index, setIndex] = useState(0);
   const [playing, setPlaying] = useState(false);
 
@@ -12,7 +12,7 @@ export function useWanderPlayback(length: number) {
       setPlaying(false);
     }, 0);
     return () => window.clearTimeout(resetTimer);
-  }, [length]);
+  }, [length, resetKey]);
 
   useEffect(() => {
     if (!playing || length === 0) return;

@@ -27,20 +27,30 @@ export default function WanderListPage() {
   const [activeNode, setActiveNode] = useState(0);
   const [result, setResult] = useState<WanderRunResult | null>(null);
   const current = WANDER_LEVELS[level - 1];
-  const playback = useWanderPlayback(result?.timeline.length ?? 0);
+  const playback = useWanderPlayback(result?.timeline.length ?? 0, result);
   const codeKey = `${level}:${language}`;
   const code = codes[codeKey] ?? codes[String(level)] ?? current.starterCodeByLanguage[language];
   const totalStars = Object.values(stars).reduce((sum, value) => sum + value, 0);
   const visitEvents = result?.timeline.slice(0, playback.index + 1).filter((event) => event.action === "VISIT_NODE") ?? [];
   const activeVisit = visitEvents[visitEvents.length - 1];
+  const nodeIndexFromId = (nodeId: unknown): number => {
+    const numeric = typeof nodeId === "string" ? Number(nodeId.replace("node_", "")) : Number.NaN;
+    return Number.isFinite(numeric) ? Math.max(0, Math.min(4, numeric - 1)) : 0;
+  };
   const activeNodeFromTimeline = typeof activeVisit?.node_id === "string"
-    ? Math.max(0, Math.min(4, Number(activeVisit.node_id.replace("node_", "")) - 1))
+    ? nodeIndexFromId(activeVisit.node_id)
     : activeNode;
-  const previousVisit = visitEvents[visitEvents.length - 2];
-  const direction = typeof activeVisit?.node_id === "string" && typeof previousVisit?.node_id === "string" &&
-    Number(activeVisit.node_id.replace("node_", "")) < Number(previousVisit.node_id.replace("node_", ""))
-    ? "backward" as const
-    : "forward" as const;
+  const direction = (() => {
+    if (!result || !activeVisit) return "forward" as const;
+    const visitIndex = result.timeline.indexOf(activeVisit);
+    for (let index = visitIndex - 1; index >= 0; index -= 1) {
+      const event = result.timeline[index];
+      if (event.action === "POINTER_READ") {
+        return event.type === "prev" ? "backward" as const : "forward" as const;
+      }
+    }
+    return "forward" as const;
+  })();
 
   useEffect(() => {
     let cancelled = false;
@@ -81,8 +91,8 @@ export default function WanderListPage() {
       } else {
         persist(level, unlocked, stars, nextCodes);
       }
-      const visit = next.timeline.findIndex((event) => event.action === "VISIT_NODE");
-      setActiveNode(visit >= 0 ? Math.min(4, visit) : 0);
+      const firstVisit = next.timeline.find((event) => event.action === "VISIT_NODE");
+      setActiveNode(firstVisit ? nodeIndexFromId(firstVisit.node_id) : 0);
     } catch (error) {
       setResult({ success: false, stars_earned: 0, star_details: { objective: false, optimal_hops: false, in_place_memory: false }, metrics: { pointer_reads: 0, pointer_writes: 0, auxiliary_space_bytes: 0 }, timeline: [], stdout: "", error: error instanceof Error ? error.message : "Could not run your itinerary." });
     } finally {

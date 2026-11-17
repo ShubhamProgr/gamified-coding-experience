@@ -24,6 +24,7 @@ const THUMBNAIL_PUBLIC_IDS = {
     "https://res.cloudinary.com/ikjuljmm/image/upload/v1793449404/algoBattleThumbnail-clean.png",
   wanderlist:
     "https://res.cloudinary.com/ikjuljmm/image/upload/v1793449404/wanderListThumbnail.png",
+  temple: "/temple.svg",
 };
 
 function cloudinaryThumbnail(source: string, width = 1024) {
@@ -83,6 +84,15 @@ const GAMES: Game[] = [
     href: "/wanderlist",
     tags: ["Python", "Linked Lists", "Pointers", "City", "16 Levels"],
     image: cloudinaryThumbnail(THUMBNAIL_PUBLIC_IDS.wanderlist),
+  },
+  {
+    id: "temple",
+    title: "Temple of Echoes",
+    description:
+      "Guide Kira through an ancient temple by writing the recursive Tower of Hanoi. Watch every call stack frame and disk move come alive.",
+    href: "/temple",
+    tags: ["Python", "Java", "C++", "Recursion", "Hanoi", "12 Levels"],
+    image: THUMBNAIL_PUBLIC_IDS.temple,
   },
 ];
 
@@ -418,7 +428,9 @@ export default function Home() {
                           ? " game-card-art--algo"
                           : game.id === "wanderlist"
                             ? " game-card-art--wander"
-                            : ""
+                            : game.id === "temple"
+                              ? " game-card-art--temple"
+                              : ""
                       }`}
                       aria-hidden="true"
                     >
@@ -431,6 +443,8 @@ export default function Home() {
                         </>
                       ) : game.id === "wanderlist" ? (
                         <span className="game-card-wander-scene" aria-label="Daytime city itinerary">☀️ 🏨 ☕ 🏛️ 🌲</span>
+                      ) : game.id === "temple" ? (
+                        <span className="game-card-temple-scene" aria-label="Ancient temple with glowing discs">🏛️ 🪨 ✨</span>
                       ) : (
                         <>
                           <span className="game-card-planet" />

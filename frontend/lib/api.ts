@@ -161,6 +161,54 @@ export function saveWanderList(token: string, save: WanderListSave): Promise<Wan
   });
 }
 
+export type TempleRunResult = {
+  success: boolean;
+  stars_earned: number;
+  star_details: {
+    objective: boolean;
+    optimal_moves: boolean;
+    no_globals: boolean;
+  };
+  metrics: {
+    move_count: number;
+    instruction_count: number;
+    disk_count: number;
+  };
+  timeline: Array<Record<string, unknown>>;
+  stdout: string;
+  error: string | null;
+};
+
+export type TempleSave = {
+  current_level: number;
+  unlocked_levels: number;
+  stars_by_level: Record<string, number>;
+  code_by_level: Record<string, string>;
+};
+
+export function runTemple(
+  levelId: number,
+  code: string,
+  language: "python" | "java" | "cpp"
+): Promise<TempleRunResult> {
+  return request<TempleRunResult>("/temple/run", {
+    method: "POST",
+    body: { level_id: levelId, code, language },
+  });
+}
+
+export function getTempleSave(token: string): Promise<TempleSave> {
+  return request<TempleSave>("/games/temple/save", { token });
+}
+
+export function saveTemple(token: string, save: TempleSave): Promise<TempleSave> {
+  return request<TempleSave>("/games/temple/save", {
+    method: "PUT",
+    token,
+    body: save,
+  });
+}
+
 export { request as apiRequest };
 
 export function login(username: string, password: string): Promise<AuthSessionResponse> {

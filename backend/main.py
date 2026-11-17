@@ -82,6 +82,7 @@ app.add_middleware(
 
 # ── Algo Battle game router ────────────────────────────────────────────────
 from algo_battle.router import router as algo_battle_router  # noqa: E402
+from temple_sdk.runner import run_submission as temple_run_submission  # noqa: E402
 from wander_sdk.runner import run_submission  # noqa: E402
 
 app.include_router(algo_battle_router)
@@ -265,6 +266,32 @@ def _ensure_mars_adventure_table() -> None:
         print(f"Warning: could not ensure Mars Adventure table: {exc}")
 
 
+def _ensure_temple_table() -> None:
+    """Create the per-user Temple of Echoes progress table."""
+    try:
+        conn = psycopg2.connect(**conn_params)
+        try:
+            with conn.cursor() as cur:
+                cur.execute(
+                    """
+                    CREATE TABLE IF NOT EXISTS temple_saves (
+                        user_id BIGINT PRIMARY KEY REFERENCES users(id) ON DELETE CASCADE,
+                        current_level INTEGER NOT NULL DEFAULT 1,
+                        unlocked_levels INTEGER NOT NULL DEFAULT 1,
+                        stars_by_level JSONB NOT NULL DEFAULT '{}'::jsonb,
+                        code_by_level JSONB NOT NULL DEFAULT '{}'::jsonb,
+                        created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+                        updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+                    )
+                    """
+                )
+            conn.commit()
+        finally:
+            conn.close()
+    except Exception as exc:
+        print(f"Warning: could not ensure Temple table: {exc}")
+
+
 def _ensure_wanderlist_table() -> None:
     """Create the per-user WanderList progress table."""
     try:
@@ -359,6 +386,19 @@ class WanderRunRequest(BaseModel):
 class WanderSave(BaseModel):
     current_level: int = Field(default=1, ge=1, le=16)
     unlocked_levels: int = Field(default=1, ge=1, le=16)
+    stars_by_level: dict[str, int] = Field(default_factory=dict)
+    code_by_level: dict[str, str] = Field(default_factory=dict)
+
+
+class TempleRunRequest(BaseModel):
+    code: str = Field(min_length=1, max_length=20_000)
+    level_id: int = Field(default=1, ge=1, le=12)
+    language: Literal["python", "java", "cpp"] = "python"
+
+
+class TempleSave(BaseModel):
+    current_level: int = Field(default=1, ge=1, le=12)
+    unlocked_levels: int = Field(default=1, ge=1, le=12)
     stars_by_level: dict[str, int] = Field(default_factory=dict)
     code_by_level: dict[str, str] = Field(default_factory=dict)
 
@@ -978,6 +1018,107 @@ async def put_wanderlist_save(
     return WanderSave(**saved)
 
 
+def _get_temple_save(user_id: int) -> dict[str, Any] | None:
+    conn = psycopg2.connect(**conn_params)
+    try:
+        with conn.cursor(cursor_factory=RealDictCursor) as cur:
+            cur.execute(
+                "SELECT current_level, unlocked_levels, stars_by_level, code_by_level "
+                "FROM temple_saves WHERE user_id = %s",
+                (user_id,),
+            )
+            row = cur.fetchone()
+            return dict(row) if row else None
+    finally:
+        conn.close()
+
+
+def _save_temple(user_id: int, save: TempleSave) -> dict[str, Any]:
+    conn = psycopg2.connect(**conn_params)
+    try:
+        with conn.cursor(cursor_factory=RealDictCursor) as cur:
+            cur.execute(
+                """
+                INSERT INTO temple_saves
+                    (user_id, current_level, unlocked_levels, stars_by_level, code_by_level)
+                VALUES (%s, %s, %s, %s, %s)
+                ON CONFLICT (user_id) DO UPDATE SET
+                    current_level = EXCLUDED.current_level,
+                    unlocked_levels = EXCLUDED.unlocked_levels,
+                    stars_by_level = EXCLUDED.stars_by_level,
+                    code_by_level = EXCLUDED.code_by_level,
+                    updated_at = NOW()
+                RETURNING current_level, unlocked_levels, stars_by_level, code_by_level
+                """,
+                (
+                    user_id,
+                    save.current_level,
+                    save.unlocked_levels,
+                    json.dumps(save.stars_by_level),
+                    json.dumps(save.code_by_level),
+                ),
+            )
+            row = cur.fetchone()
+        conn.commit()
+        return dict(row)
+    finally:
+        conn.close()
+
+
+@app.post("/temple/run")
+async def run_temple(request: TempleRunRequest) -> dict[str, Any]:
+    """Run a Hanoi recursion submission and return its playback timeline."""
+    try:
+        result = await asyncio.to_thread(
+            temple_run_submission, request.code, request.level_id, request.language
+        )
+        return result.as_dict()
+    except Exception as exc:
+        print(f"Warning: Temple run failed: {exc}")
+        return {
+            "success": False,
+            "stars_earned": 0,
+            "star_details": {
+                "objective": False,
+                "optimal_moves": False,
+                "no_globals": False,
+            },
+            "metrics": {
+                "move_count": 0,
+                "instruction_count": 0,
+                "disk_count": 0,
+            },
+            "timeline": [],
+            "stdout": "",
+            "error": f"Could not run your submission: {exc}",
+        }
+
+
+@app.get("/games/temple/save", response_model=TempleSave)
+async def get_temple_save(
+    current_user: dict = Depends(_get_current_user),
+) -> TempleSave:
+    try:
+        save = await asyncio.to_thread(_get_temple_save, current_user["id"])
+    except Exception as exc:
+        print(f"Warning: could not load Temple save: {exc}")
+        raise HTTPException(status_code=503, detail="Game save is temporarily unavailable")
+    return TempleSave(**(save or {}))
+
+
+@app.put("/games/temple/save", response_model=TempleSave)
+async def put_temple_save(
+    save: TempleSave,
+    current_user: dict = Depends(_get_current_user),
+) -> TempleSave:
+    try:
+        saved = await asyncio.to_thread(_save_temple, current_user["id"], save)
+    except Exception as exc:
+        print(f"Warning: could not save Temple progress: {exc}")
+        raise HTTPException(status_code=503, detail="Game save is temporarily unavailable")
+    return TempleSave(**saved)
+
+
 # ── Endpoints ──────────────────────────────────────────────────────────────
 
 @app.on_event("startup")
@@ -985,6 +1126,7 @@ async def _startup() -> None:
     _ensure_users_table()
     _ensure_mars_adventure_table()
     _ensure_wanderlist_table()
+    _ensure_temple_table()
     from algo_battle import db as algo_battle_db
 
     await asyncio.to_thread(algo_battle_db.initialize)
